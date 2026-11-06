@@ -40,13 +40,34 @@
     <button class="boton-sec" type="button" id="abrir-qr">Compartir perfil</button>
   </div>
 
-  <section class="vacio">
-    {% if es_mio %}
-      <p><strong>Aún no tienes publicaciones</strong></p>
-      <p>Tus publicaciones aparecerán aquí.</p>
+<!-- Botón para publicar (solo visible si es tu propio perfil) -->
+  {% if es_mio %}
+    <div style="text-align: center; margin: 20px 0;">
+      <a href="{{ url_for('publicar') }}" class="boton">+ Crear nuevo Stand</a>
+    </div>
+  {% endif %}
+
+  <!-- Grilla de publicaciones estilo Instagram -->
+  <section class="galeria-stands">
+    {% for pub in publicaciones %}
+      <div class="stand-item">
+        {% if pub.es_video %}
+          <video src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" autoplay muted loop playsinline></video>
+        {% else %}
+          <img src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" alt="Stand de @{{ u.username }}">
+        {% endif %}
+      </div>
     {% else %}
-      <p><strong>Aún no hay publicaciones</strong></p>
-    {% endif %}
+      <!-- Este bloque se muestra si el usuario aún no tiene fotos/videos -->
+      <div class="vacio" style="grid-column: 1 / -1;">
+        {% if es_mio %}
+          <p><strong>Aún no tienes publicaciones</strong></p>
+          <p>Tus publicaciones aparecerán aquí.</p>
+        {% else %}
+          <p><strong>Aún no hay publicaciones</strong></p>
+        {% endif %}
+      </div>
+    {% endfor %}
   </section>
 
   <dialog id="dlg-qr" aria-labelledby="qr-titulo">

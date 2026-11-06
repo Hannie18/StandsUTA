@@ -17,7 +17,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
 app.secret_key = "cambia-esta-clave-por-una-propia"
-app.config["MAX_CONTENT_LENGTH"] = 3 * 1024 * 1024  # fotos de hasta 3 MB
+app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024  # fotos y videos de hasta 15 MB
 
 EDAD_MINIMA = 13  # controlador de edad: cámbialo a 18 si lo prefieres
 USER_RE = r"[A-Za-z0-9._]{3,30}"
@@ -173,11 +173,20 @@ def mostrar_perfil(u):
     enlaces = [{"url": url, "texto": urlparse(url).netloc.removeprefix("www.")}
                for url in json.loads(u["enlaces"] or "[]")]
     es_mio = u["id"] == session["user_id"]
+    
+    # NUEVO: Extraer las publicaciones del usuario (de la más nueva a la más vieja)
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT * FROM publicaciones WHERE usuario_id=%s ORDER BY creado_en DESC", (u["id"],))
+        publicaciones = cur.fetchall()
+    db.close()
+
     return render_template(
         "perfil.html", u=u, nombre_completo=nombre, enlaces=enlaces,
         sexo=SEXOS.get(u["sexo"]), es_mio=es_mio, seccion="perfil" if es_mio else "",
-        url_perfil=url_for("perfil_publico", username=u["username"], _external=True))
-
+        url_perfil=url_for("perfil_publico", username=u["username"], _external=True),
+        publicaciones=publicaciones
+    )
 
 @app.route("/perfil")
 @login_requerido
@@ -307,3 +316,54 @@ def foto_muy_pesada(e):
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+# ---------- Publicaciones (Stands) ----------
+@app.route("/publicar", methods=["GET", "POST"])
+@login_requerido
+def publicar():
+    if request.method == "POST":
+        descripcion = request.form.get("descripcion", "").strip()
+        ubicacion = request.form.get("ubicacion", "").strip()
+        musica = request.form.get("musica", "").strip()
+        archivo = request.files.get("multimedia")
+        
+        nombre_archivo = None
+        es_video = False
+        errores = []
+
+        if archivo and archivo.filename:
+            ext = archivo.filename.rsplit('.', 1)[-1].lower()
+            if ext in ['png', 'jpg', 'jpeg', 'webp']:
+                nombre_archivo = f"{uuid4().hex}.{ext}"
+            elif ext in ['mp4', 'webm', 'mov']:
+                nombre_archivo = f"{uuid4().hex}.{ext}"
+                es_video = True
+            else:
+                errores.append("Formato no válido. Sube imágenes (JPG/PNG) o videos cortos (MP4).")
+            
+            if not errores:
+                archivo.save(os.path.join(CARPETA_FOTOS, nombre_archivo))
+
+        if not errores and (nombre_archivo or descripcion):
+            db = get_db()
+            try:
+                with db.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO publicaciones (usuario_id, descripcion, ubicacion, musica, archivo_multimedia, es_video) "
+                        "VALUES (%s, %s, %s, %s, %s, %s)",
+                        (session["user_id"], descripcion or None, ubicacion or None, musica or None, nombre_archivo, es_video)
+                    )
+                db.commit()
+                flash("Publicación subida con éxito.", "ok")
+                return redirect(url_for("perfil"))
+            except Exception:
+                errores.append("Error al guardar en la base de datos.")
+            finally:
+                db.close()
+        elif not errores:
+            errores.append("Debes añadir al menos una foto, un video o una descripción.")
+        
+        for e in errores:
+            flash(e, "error")
+
+    return render_template("publicar.html", seccion="publicar")

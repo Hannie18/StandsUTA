@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titulo %}Crear Stand · StandsUTA{% endblock %}
+{% block contenido %}
+  <h1>Crear nuevo Stand</h1>
+  
+  <form method="post" enctype="multipart/form-data" class="formulario">
+    <label for="multimedia">Foto o Video (Max 15MB)</label>
+    <input type="file" id="multimedia" name="multimedia" accept="image/*,video/mp4,video/webm" required>
+
+    <label for="descripcion">Descripción</label>
+    <textarea id="descripcion" name="descripcion" rows="4" placeholder="¿De qué trata este Stand?"></textarea>
+
+    <label for="ubicacion">Ubicación (Opcional)</label>
+    <input type="text" id="ubicacion" name="ubicacion" placeholder="Ej: Facultad FISEI, UTA">
+
+    <label for="musica">Música (Opcional)</label>
+    <input type="text" id="musica" name="musica" placeholder="Ej: Canción - Artista">
+
+    <button class="boton" type="submit">Publicar Stand</button>
+  </form>
+{% endblock %}
