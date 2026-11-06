@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}StandsUTA{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <main class="pantalla">
+    <aside class="marca">
+      <p class="logo">StandsUTA</p>
+      <p class="lema">Comparte tus stands y descubre los de los demás.</p>
+      <div class="franja" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    </aside>
+
+    <section class="panel">
+      <div class="tarjeta">
+        {% with mensajes = get_flashed_messages(with_categories=true) %}
+          {% for categoria, texto in mensajes %}
+            <p class="aviso {{ categoria }}" role="alert">{{ texto }}</p>
+          {% endfor %}
+        {% endwith %}
+        {% block contenido %}{% endblock %}
+      </div>
+    </section>
+  </main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

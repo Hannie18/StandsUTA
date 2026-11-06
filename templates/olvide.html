@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block titulo %}Recuperar contraseña · StandsUTA{% endblock %}
+{% block contenido %}
+  <h1>Recuperar contraseña</h1>
+  <p class="ayuda">Escribe tu usuario, correo o número y te enviaremos instrucciones.</p>
+  <form method="post" class="formulario">
+    <label for="usuario">Usuario, correo o número</label>
+    <input id="usuario" name="usuario" type="text" placeholder="Añadir nombre de usuario, correo o número" required>
+    <button class="boton" type="submit">Enviar instrucciones</button>
+  </form>
+  <p class="alterno"><a href="{{ url_for('login') }}">Volver a iniciar sesión</a></p>
+{% endblock %}

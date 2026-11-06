@@ -1,0 +1,9 @@
+{% extends "app_base.html" %}
+{% block titulo %}Para ti · StandsUTA{% endblock %}
+{% block contenido %}
+  <header class="barra-sup"><h1>Para ti</h1></header>
+  <section class="vacio">
+    <p><strong>Todavía no hay nada por aquí</strong></p>
+    <p>Mientras llegan las primeras publicaciones, <a href="{{ url_for('editar_perfil') }}">completa tu perfil</a>.</p>
+  </section>
+{% endblock %}

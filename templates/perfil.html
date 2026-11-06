@@ -1,0 +1,77 @@
+{% extends "app_base.html" %}
+{% from "iconos.html" import engranaje, usuario as icono_usuario %}
+{% block titulo %}@{{ u.username }} · StandsUTA{% endblock %}
+{% block contenido %}
+  <header class="barra-sup">
+    <h1>@{{ u.username }}</h1>
+    {% if es_mio %}
+      <button class="icono-btn" type="button" aria-label="Configuración">{{ engranaje() }}</button>
+    {% endif %}
+  </header>
+
+  <section class="cabecera">
+    {% if u.foto %}
+      <img class="avatar" src="{{ url_for('static', filename='uploads/' ~ u.foto) }}" alt="Foto de perfil de @{{ u.username }}">
+    {% else %}
+      <div class="avatar" role="img" aria-label="Sin foto de perfil">{{ icono_usuario() }}</div>
+    {% endif %}
+    <ul class="cifras">
+      <li><strong>0</strong><span>publicaciones</span></li>
+      <li><strong>0</strong><span>seguidores</span></li>
+      <li><strong>0</strong><span>seguidos</span></li>
+    </ul>
+  </section>
+
+  <section class="datos">
+    <p class="nombre">{{ nombre_completo }}</p>
+    {% if u.pronombres %}<p class="detalle">Pronombres: {{ u.pronombres }}</p>{% endif %}
+    {% if sexo %}<p class="detalle">Sexo: {{ sexo }}</p>{% endif %}
+    {% if enlaces %}
+      <ul class="enlaces">
+        {% for e in enlaces %}
+          <li><a href="{{ e.url }}" target="_blank" rel="noopener noreferrer">{{ e.texto }}</a></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </section>
+
+  <div class="acciones">
+    {% if es_mio %}<a class="boton" href="{{ url_for('editar_perfil') }}">Editar perfil</a>{% endif %}
+    <button class="boton-sec" type="button" id="abrir-qr">Compartir perfil</button>
+  </div>
+
+  <section class="vacio">
+    {% if es_mio %}
+      <p><strong>Aún no tienes publicaciones</strong></p>
+      <p>Tus publicaciones aparecerán aquí.</p>
+    {% else %}
+      <p><strong>Aún no hay publicaciones</strong></p>
+    {% endif %}
+  </section>
+
+  <dialog id="dlg-qr" aria-labelledby="qr-titulo">
+    <h2 id="qr-titulo">Compartir perfil</h2>
+    <img src="{{ url_for('codigo_qr', username=u.username) }}" alt="Código QR del perfil de @{{ u.username }}" width="220" height="220">
+    <p class="url-perfil" id="url-perfil">{{ url_perfil }}</p>
+    <div class="acciones">
+      <button class="boton" type="button" id="copiar">Copiar enlace</button>
+      <button class="boton-sec" type="button" id="cerrar-qr">Cerrar</button>
+    </div>
+  </dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const dialogo = document.getElementById('dlg-qr');
+  document.getElementById('abrir-qr').addEventListener('click', () => dialogo.showModal());
+  document.getElementById('cerrar-qr').addEventListener('click', () => dialogo.close());
+  document.getElementById('copiar').addEventListener('click', async (e) => {
+    try {
+      await navigator.clipboard.writeText(document.getElementById('url-perfil').textContent.trim());
+      e.target.textContent = 'Enlace copiado';
+    } catch (error) {
+      e.target.textContent = 'No se pudo copiar';
+    }
+  });
+</script>
+{% endblock %}

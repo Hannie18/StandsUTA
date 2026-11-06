@@ -1,0 +1,67 @@
+{% extends "app_base.html" %}
+{% from "iconos.html" import usuario as icono_usuario %}
+{% block titulo %}Editar perfil · StandsUTA{% endblock %}
+{% block contenido %}
+  <header class="barra-sup"><h1>Editar perfil</h1></header>
+
+  <form method="post" enctype="multipart/form-data" class="formulario panel-form">
+    <div class="fila-foto">
+      {% if u.foto %}
+        <img id="vista-foto" class="avatar avatar-chico" src="{{ url_for('static', filename='uploads/' ~ u.foto) }}" alt="Tu foto de perfil actual">
+      {% else %}
+        <div id="vista-foto-vacia" class="avatar avatar-chico" role="img" aria-label="Sin foto de perfil">{{ icono_usuario() }}</div>
+        <img id="vista-foto" class="avatar avatar-chico" src="" alt="Vista previa de tu nueva foto" hidden>
+      {% endif %}
+      <label class="boton-sec" for="foto">Cambiar foto</label>
+      <input id="foto" name="foto" type="file" accept="image/png,image/jpeg,image/webp" class="solo-lectores">
+    </div>
+    <p class="ayuda">PNG, JPG o WEBP, de hasta 3 MB.</p>
+
+    <label for="nombre">Nombre</label>
+    <input id="nombre" name="nombre" type="text" maxlength="40" value="{{ datos.get('nombre', '') }}" placeholder="Añadir nombre" autocomplete="given-name">
+
+    <label for="apellido">Apellido</label>
+    <input id="apellido" name="apellido" type="text" maxlength="40" value="{{ datos.get('apellido', '') }}" placeholder="Añadir apellido" autocomplete="family-name">
+    <p class="ayuda">Mientras no escribas tu nombre y apellido, tu perfil aparece como «Anónimo».</p>
+
+    <label for="username">Nombre de usuario</label>
+    <input id="username" name="username" type="text" maxlength="30" value="{{ datos.get('username', '') }}" required>
+
+    <label for="pronombres">Pronombres</label>
+    <input id="pronombres" name="pronombres" type="text" maxlength="30" value="{{ datos.get('pronombres', '') }}" placeholder="Ej.: ella, él, elle" list="lista-pronombres">
+    <datalist id="lista-pronombres"><option value="ella"><option value="él"><option value="elle"></datalist>
+
+    <label for="sexo">Sexo</label>
+    <select id="sexo" name="sexo">
+      <option value="">Prefiero no decirlo</option>
+      {% for clave, etiqueta in sexos.items() %}
+        <option value="{{ clave }}" {% if datos.get('sexo') == clave %}selected{% endif %}>{{ etiqueta }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="enlace1">Enlaces a otras redes</label>
+    <input id="enlace1" name="enlace1" type="text" maxlength="200" value="{{ datos.get('enlace1', '') }}" placeholder="instagram.com/tuusuario" aria-label="Enlace 1">
+    <input name="enlace2" type="text" maxlength="200" value="{{ datos.get('enlace2', '') }}" placeholder="tiktok.com/@tuusuario" aria-label="Enlace 2">
+    <input name="enlace3" type="text" maxlength="200" value="{{ datos.get('enlace3', '') }}" placeholder="Otro enlace" aria-label="Enlace 3">
+
+    <div class="acciones acciones-form">
+      <button class="boton" type="submit">Guardar cambios</button>
+      <a class="boton-sec" href="{{ url_for('perfil') }}">Cancelar</a>
+    </div>
+  </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Vista previa de la foto elegida (solo visual)
+  document.getElementById('foto').addEventListener('change', (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    const vista = document.getElementById('vista-foto');
+    const vacia = document.getElementById('vista-foto-vacia');
+    vista.src = URL.createObjectURL(archivo);
+    vista.hidden = false;
+    if (vacia) vacia.hidden = true;
+  });
+</script>
+{% endblock %}

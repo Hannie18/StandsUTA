@@ -1,0 +1,18 @@
+CREATE DATABASE IF NOT EXISTS standsuta CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE standsuta;
+
+CREATE TABLE IF NOT EXISTS usuarios (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(30) NOT NULL UNIQUE,
+  email VARCHAR(120) UNIQUE,
+  telefono VARCHAR(20) UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  fecha_nacimiento DATE NOT NULL,
+  nombre VARCHAR(40) NULL,
+  apellido VARCHAR(40) NULL,
+  pronombres VARCHAR(30) NULL,
+  sexo VARCHAR(10) NULL,
+  foto VARCHAR(60) NULL,
+  enlaces TEXT NULL,
+  creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

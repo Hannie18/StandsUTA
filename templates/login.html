@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block titulo %}Iniciar sesión · StandsUTA{% endblock %}
+{% block contenido %}
+  <h1>Iniciar sesión</h1>
+  <form method="post" class="formulario">
+    <label for="usuario">Usuario, correo o número</label>
+    <input id="usuario" name="usuario" type="text" placeholder="Añadir nombre de usuario, correo o número" autocomplete="username" required>
+
+    <label for="password">Contraseña</label>
+    <input id="password" name="password" type="password" placeholder="Añadir contraseña" autocomplete="current-password" required>
+
+    <button class="boton" type="submit">Iniciar sesión</button>
+  </form>
+  <a class="enlace" href="{{ url_for('olvide') }}">¿Has olvidado tu contraseña?</a>
+  <p class="alterno">¿No tienes cuenta? <a href="{{ url_for('registro') }}">Regístrate</a></p>
+{% endblock %}
