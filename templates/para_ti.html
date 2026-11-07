@@ -32,7 +32,12 @@
 
         <!-- Contenido Multimedia -->
         {% if pub.archivo_multimedia %}
-          <div class="post-media">
+          <div class="post-media btn-ver-media" 
+               style="cursor: pointer;"
+               data-url="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}"
+               data-video="{{ pub.es_video }}"
+               data-desc="{{ pub.descripcion or '' }}"
+               data-autor="@{{ pub.username }}">
             {% if pub.es_video %}
               <video src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" controls></video>
             {% else %}
@@ -44,16 +49,16 @@
         <!-- Detalles e Interacciones -->
         <div class="post-info">
           <div class="acciones-post">
-            <button class="icono-btn btn-like" type="button" onclick="toggleLike({{ pub.id }})" title="Me gusta">
+            <button class="icono-btn btn-like" type="button" data-id="{{ pub.id }}" title="Me gusta">
               <span id="heart-{{ pub.id }}">{{ '❤️' if pub.dio_like else '🤍' }}</span>
               <span id="likes-count-{{ pub.id }}" class="conteo-likes">{{ pub.total_likes }}</span>
             </button>
             
-            <button class="icono-btn" type="button" onclick="document.getElementById('input-comentario-{{ pub.id }}').focus()" title="Comentar">💬</button>
+            <button class="icono-btn btn-comentar-focus" type="button" data-id="{{ pub.id }}" title="Comentar">💬</button>
             
-            <button class="icono-btn btn-share" type="button" onclick="compartirStand('{{ url_for('perfil_publico', username=pub.username, _external=True) }}')" title="Compartir">🔗</button>
+            <button class="icono-btn btn-share" type="button" data-url="{{ url_for('perfil_publico', username=pub.username, _external=True) }}" title="Compartir">🔗</button>
             
-            <button class="icono-btn btn-save btn-guardar-right" type="button" onclick="toggleGuardar({{ pub.id }})" title="Guardar">
+            <button class="icono-btn btn-save btn-guardar-right" type="button" data-id="{{ pub.id }}" title="Guardar">
               <span id="bookmark-{{ pub.id }}">{{ '🔖' if pub.esta_guardado else '📑' }}</span>
             </button>
           </div>
@@ -90,32 +95,100 @@
       </section>
     {% endfor %}
   </div>
+
+  <!-- Modal para ver la imagen/video en grande -->
+  <dialog id="modal-ver-media" class="modal-media-dialog">
+    <div class="contenedor-modal-media">
+      <button type="button" class="cerrar-modal" id="btn-cerrar-modal">&times;</button>
+      <div id="media-target"></div>
+      <p id="desc-modal" class="desc-modal"></p>
+    </div>
+  </dialog>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  async function toggleLike(pubId) {
-    const res = await fetch('/like/' + pubId, { method: 'POST' });
-    const data = await res.json();
-    if (data.status === 'ok') {
-      document.getElementById('heart-' + pubId).textContent = data.le_gusta ? '❤️' : '🤍';
-      document.getElementById('likes-count-' + pubId).textContent = data.total;
-    }
-  }
+  document.addEventListener('DOMContentLoaded', () => {
+    // Manejo de Likes
+    document.querySelectorAll('.btn-like').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const pubId = btn.getAttribute('data-id');
+        const res = await fetch('/like/' + pubId, { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          document.getElementById('heart-' + pubId).textContent = data.le_gusta ? '❤️' : '🤍';
+          document.getElementById('likes-count-' + pubId).textContent = data.total;
+        }
+      });
+    });
 
-  async function toggleGuardar(pubId) {
-    const res = await fetch('/guardar/' + pubId, { method: 'POST' });
-    const data = await res.json();
-    if (data.status === 'ok') {
-      document.getElementById('bookmark-' + pubId).textContent = data.guardado ? '🔖' : '📑';
-    }
-  }
+    // Manejo de Guardados
+    document.querySelectorAll('.btn-save').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const pubId = btn.getAttribute('data-id');
+        const res = await fetch('/guardar/' + pubId, { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          document.getElementById('bookmark-' + pubId).textContent = data.guardado ? '🔖' : '📑';
+        }
+      });
+    });
 
-  function compartirStand(url) {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(url);
-      alert('¡Enlace del Stand copiado al portapapeles!');
+    // Enfocar comentario
+    document.querySelectorAll('.btn-comentar-focus').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pubId = btn.getAttribute('data-id');
+        const campo = document.getElementById('input-comentario-' + pubId);
+        if (campo) campo.focus();
+      });
+    });
+
+    // Compartir
+    document.querySelectorAll('.btn-share').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const url = btn.getAttribute('data-url');
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(url);
+          alert('¡Enlace del Stand copiado al portapapeles!');
+        }
+      });
+    });
+
+    // Modal de Multimedia
+    const modalMedia = document.getElementById('modal-ver-media');
+    const mediaTarget = document.getElementById('media-target');
+    const descModal = document.getElementById('desc-modal');
+    const btnCerrar = document.getElementById('btn-cerrar-modal');
+
+    document.querySelectorAll('.btn-ver-media').forEach(el => {
+      el.addEventListener('click', () => {
+        const url = el.getAttribute('data-url');
+        const esVideo = el.getAttribute('data-video');
+        const descripcion = el.getAttribute('data-desc');
+        const autor = el.getAttribute('data-autor');
+
+        const esVid = (esVideo === 'True' || esVideo === '1' || esVideo === 'true');
+        if (esVid) {
+          mediaTarget.innerHTML = `<video src="${url}" controls autoplay loop style="max-width:100%; max-height:70vh; border-radius:8px;"></video>`;
+        } else {
+          mediaTarget.innerHTML = `<img src="${url}" alt="Stand" style="max-width:100%; max-height:70vh; object-fit:contain; border-radius:8px;">`;
+        }
+        descModal.textContent = descripcion ? `${autor}: ${descripcion}` : autor;
+        if (modalMedia) modalMedia.showModal();
+      });
+    });
+
+    function cerrarModal() {
+      if (mediaTarget) mediaTarget.innerHTML = '';
+      if (modalMedia) modalMedia.close();
     }
-  }
+
+    if (btnCerrar) btnCerrar.addEventListener('click', cerrarModal);
+    if (modalMedia) {
+      modalMedia.addEventListener('click', (e) => {
+        if (e.target === modalMedia) cerrarModal();
+      });
+    }
+  });
 </script>
 {% endblock %}

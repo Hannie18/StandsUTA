@@ -1,6 +1,7 @@
 {% extends "app_base.html" %}
 {% from "iconos.html" import engranaje, usuario as icono_usuario %}
 {% block titulo %}@{{ u.username }} · StandsUTA{% endblock %}
+
 {% block contenido %}
   <header class="barra-sup">
     <h1>@{{ u.username }}</h1>
@@ -16,7 +17,7 @@
       <div class="avatar" role="img" aria-label="Sin foto de perfil">{{ icono_usuario() }}</div>
     {% endif %}
     <ul class="cifras">
-      <li><strong>0</strong><span>publicaciones</span></li>
+      <li><strong>{{ publicaciones|length }}</strong><span>publicaciones</span></li>
       <li><strong>0</strong><span>seguidores</span></li>
       <li><strong>0</strong><span>seguidos</span></li>
     </ul>
@@ -40,25 +41,28 @@
     <button class="boton-sec" type="button" id="abrir-qr">Compartir perfil</button>
   </div>
 
-<!-- Botón para publicar (solo visible si es tu propio perfil) -->
   {% if es_mio %}
     <div style="text-align: center; margin: 20px 0;">
       <a href="{{ url_for('publicar') }}" class="boton">+ Crear nuevo Stand</a>
     </div>
   {% endif %}
 
-  <!-- Grilla de publicaciones estilo Instagram -->
+  <!-- Grilla de publicaciones -->
   <section class="galeria-stands">
     {% for pub in publicaciones %}
-      <div class="stand-item">
+      <div class="stand-item item-perfil-media" 
+           style="cursor: pointer;"
+           data-url="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}"
+           data-video="{{ pub.es_video }}"
+           data-desc="{{ pub.descripcion or '' }}"
+           data-autor="@{{ u.username }}">
         {% if pub.es_video %}
-          <video src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" autoplay muted loop playsinline></video>
+          <video src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" muted loop playsinline></video>
         {% else %}
           <img src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" alt="Stand de @{{ u.username }}">
         {% endif %}
       </div>
     {% else %}
-      <!-- Este bloque se muestra si el usuario aún no tiene fotos/videos -->
       <div class="vacio" style="grid-column: 1 / -1;">
         {% if es_mio %}
           <p><strong>Aún no tienes publicaciones</strong></p>
@@ -70,6 +74,7 @@
     {% endfor %}
   </section>
 
+  <!-- Dialog / Modal para compartir QR -->
   <dialog id="dlg-qr" aria-labelledby="qr-titulo">
     <h2 id="qr-titulo">Compartir perfil</h2>
     <img src="{{ url_for('codigo_qr', username=u.username) }}" alt="Código QR del perfil de @{{ u.username }}" width="220" height="220">
@@ -79,19 +84,73 @@
       <button class="boton-sec" type="button" id="cerrar-qr">Cerrar</button>
     </div>
   </dialog>
+
+  <!-- Dialog / Modal para ver la publicación en pantalla grande -->
+  <dialog id="modal-ver-media" class="modal-media-dialog">
+    <div class="contenedor-modal-media">
+      <button type="button" class="cerrar-modal" id="btn-cerrar-media-perfil">&times;</button>
+      <div id="media-target"></div>
+      <p id="desc-modal" class="desc-modal"></p>
+    </div>
+  </dialog>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  const dialogo = document.getElementById('dlg-qr');
-  document.getElementById('abrir-qr').addEventListener('click', () => dialogo.showModal());
-  document.getElementById('cerrar-qr').addEventListener('click', () => dialogo.close());
-  document.getElementById('copiar').addEventListener('click', async (e) => {
-    try {
-      await navigator.clipboard.writeText(document.getElementById('url-perfil').textContent.trim());
-      e.target.textContent = 'Enlace copiado';
-    } catch (error) {
-      e.target.textContent = 'No se pudo copiar';
+  document.addEventListener('DOMContentLoaded', () => {
+    // QR Modal
+    const dialogo = document.getElementById('dlg-qr');
+    const btnAbrirQR = document.getElementById('abrir-qr');
+    const btnCerrarQR = document.getElementById('cerrar-qr');
+    const btnCopiar = document.getElementById('copiar');
+
+    if (btnAbrirQR) btnAbrirQR.addEventListener('click', () => dialogo.showModal());
+    if (btnCerrarQR) btnCerrarQR.addEventListener('click', () => dialogo.close());
+    if (btnCopiar) {
+      btnCopiar.addEventListener('click', async (e) => {
+        try {
+          await navigator.clipboard.writeText(document.getElementById('url-perfil').textContent.trim());
+          e.target.textContent = 'Enlace copiado';
+        } catch (error) {
+          e.target.textContent = 'No se pudo copiar';
+        }
+      });
+    }
+
+    // Multimedia Modal en Perfil
+    const modalMedia = document.getElementById('modal-ver-media');
+    const mediaTarget = document.getElementById('media-target');
+    const descModal = document.getElementById('desc-modal');
+    const btnCerrarMedia = document.getElementById('btn-cerrar-media-perfil');
+
+    document.querySelectorAll('.item-perfil-media').forEach(item => {
+      item.addEventListener('click', () => {
+        const url = item.getAttribute('data-url');
+        const esVideo = item.getAttribute('data-video');
+        const descripcion = item.getAttribute('data-desc');
+        const autor = item.getAttribute('data-autor');
+
+        const esVid = (esVideo === 'True' || esVideo === '1' || esVideo === 'true');
+        if (esVid) {
+          mediaTarget.innerHTML = `<video src="${url}" controls autoplay loop style="max-width:100%; max-height:70vh; border-radius:8px;"></video>`;
+        } else {
+          mediaTarget.innerHTML = `<img src="${url}" alt="Stand" style="max-width:100%; max-height:70vh; object-fit:contain; border-radius:8px;">`;
+        }
+        descModal.textContent = descripcion ? `${autor}: ${descripcion}` : autor;
+        if (modalMedia) modalMedia.showModal();
+      });
+    });
+
+    function cerrarMedia() {
+      if (mediaTarget) mediaTarget.innerHTML = '';
+      if (modalMedia) modalMedia.close();
+    }
+
+    if (btnCerrarMedia) btnCerrarMedia.addEventListener('click', cerrarMedia);
+    if (modalMedia) {
+      modalMedia.addEventListener('click', (e) => {
+        if (e.target === modalMedia) cerrarMedia();
+      });
     }
   });
 </script>
