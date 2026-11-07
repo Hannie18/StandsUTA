@@ -308,15 +308,42 @@ def mostrar_perfil(u):
         publicaciones=publicaciones
     )
 
+# ---------- Ruta Perfil ----------
 @app.route("/perfil")
 @login_requerido
 def perfil():
-    u = obtener_usuario("id", session["user_id"])
-    if not u:
-        session.clear()
-        return redirect(url_for("login"))
-    return mostrar_perfil(u)
+    user_id = session["user_id"]
+    db = get_db()
+    with db.cursor() as cur:
+        # Traer usuario actual
+        cur.execute("SELECT * FROM usuarios WHERE id = %s", (user_id,))
+        u = cur.fetchone()
 
+        # Traer publicaciones con métricas e interacciones
+        cur.execute("""
+            SELECT p.*,
+              (SELECT COUNT(*) FROM me_gusta WHERE publicacion_id = p.id) AS total_likes,
+              (SELECT COUNT(*) FROM me_gusta WHERE publicacion_id = p.id AND usuario_id = %s) AS dio_like,
+              (SELECT COUNT(*) FROM guardados WHERE publicacion_id = p.id AND usuario_id = %s) AS esta_guardado
+            FROM publicaciones p
+            WHERE p.usuario_id = %s
+            ORDER BY p.creado_en DESC
+        """, (user_id, user_id, user_id))
+        publicaciones = cur.fetchall()
+
+        # Cargar comentarios de cada publicación del perfil
+        for p in publicaciones:
+            cur.execute("""
+                SELECT c.texto, c.creado_en, u.username 
+                FROM comentarios c 
+                JOIN usuarios u ON c.usuario_id = u.id 
+                WHERE c.publicacion_id = %s 
+                ORDER BY c.creado_en ASC
+            """, (p["id"],))
+            p["comentarios"] = cur.fetchall()
+
+    db.close()
+    return render_template("perfil.html", u=u, publicaciones=publicaciones, es_mio=True)
 
 @app.route("/u/<username>")
 @login_requerido

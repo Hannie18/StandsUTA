@@ -273,15 +273,24 @@ textarea:focus-visible {
   border-left: 3px solid var(--rojo);
 }
 
-/* Modal de vista ampliada de multimedia */
+/* Modal de vista ampliada centrado en pantalla */
 .modal-media-dialog {
   border: 0;
   border-radius: 16px;
   padding: 1.5rem;
-  background: var(--negro);
-  color: var(--rosa);
-  max-width: 90vw;
-  max-height: 90vh;
+  background: #fff;
+  color: var(--negro);
+  width: min(520px, 90vw);
+  max-height: 85vh;
+  margin: auto;
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.modal-media-dialog::backdrop {
+  background: rgba(42, 14, 12, 0.75);
 }
 
 .modal-media-dialog::backdrop {
