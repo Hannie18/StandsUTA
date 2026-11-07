@@ -205,6 +205,88 @@ def borrar_publicacion(pub_id):
     # Devuelve al usuario a la página donde estaba (perfil o inicio)
     return redirect(request.referrer or url_for("inicio"))
 
+# ---------- Interacciones (Likes, Guardados, Comentarios) ----------
+@app.route("/like/<int:pub_id>", methods=["POST"])
+@login_requerido
+def dar_like(pub_id):
+    db = get_db()
+    user_id = session["user_id"]
+    with db.cursor() as cur:
+        cur.execute("SELECT * FROM me_gusta WHERE usuario_id=%s AND publicacion_id=%s", (user_id, pub_id))
+        existe = cur.fetchone()
+        if existe:
+            cur.execute("DELETE FROM me_gusta WHERE usuario_id=%s AND publicacion_id=%s", (user_id, pub_id))
+            le_gusta = False
+        else:
+            cur.execute("INSERT INTO me_gusta (usuario_id, publicacion_id) VALUES (%s, %s)", (user_id, pub_id))
+            le_gusta = True
+        db.commit()
+        
+        cur.execute("SELECT COUNT(*) as total FROM me_gusta WHERE publicacion_id=%s", (pub_id,))
+        total = cur.fetchone()["total"]
+    db.close()
+    return {"status": "ok", "le_gusta": le_gusta, "total": total}
+
+@app.route("/guardar/<int:pub_id>", methods=["POST"])
+@login_requerido
+def guardar_stand(pub_id):
+    db = get_db()
+    user_id = session["user_id"]
+    with db.cursor() as cur:
+        cur.execute("SELECT * FROM guardados WHERE usuario_id=%s AND publicacion_id=%s", (user_id, pub_id))
+        existe = cur.fetchone()
+        if existe:
+            cur.execute("DELETE FROM guardados WHERE usuario_id=%s AND publicacion_id=%s", (user_id, pub_id))
+            guardado = False
+        else:
+            cur.execute("INSERT INTO guardados (usuario_id, publicacion_id) VALUES (%s, %s)", (user_id, pub_id))
+            guardado = True
+        db.commit()
+    db.close()
+    return {"status": "ok", "guardado": guardado}
+
+@app.route("/comentar/<int:pub_id>", methods=["POST"])
+@login_requerido
+def comentar(pub_id):
+    texto = request.form.get("texto", "").strip()
+    if texto:
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("INSERT INTO comentarios (usuario_id, publicacion_id, texto) VALUES (%s, %s, %s)",
+                        (session["user_id"], pub_id, texto))
+            db.commit()
+        db.close()
+    return redirect(request.referrer or url_for("inicio"))
+
+# ---------- Editar Publicación ----------
+@app.route("/editar_publicacion/<int:pub_id>", methods=["GET", "POST"])
+@login_requerido
+def editar_publicacion(pub_id):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT * FROM publicaciones WHERE id=%s AND usuario_id=%s", (pub_id, session["user_id"]))
+        pub = cur.fetchone()
+        if not pub:
+            db.close()
+            flash("No tienes permiso o la publicación no existe.", "error")
+            return redirect(url_for("inicio"))
+
+        if request.method == "POST":
+            descripcion = request.form.get("descripcion", "").strip()
+            ubicacion = request.form.get("ubicacion", "").strip()
+            musica = request.form.get("musica", "").strip()
+            cur.execute(
+                "UPDATE publicaciones SET descripcion=%s, ubicacion=%s, musica=%s WHERE id=%s",
+                (descripcion or None, ubicacion or None, musica or None, pub_id)
+            )
+            db.commit()
+            db.close()
+            flash("Stand actualizado correctamente.", "ok")
+            return redirect(url_for("perfil"))
+
+    db.close()
+    return render_template("editar_publicacion.html", pub=pub)
+
 # ---------- Perfil ----------
 def mostrar_perfil(u):
     nombre = " ".join(x for x in (u["nombre"], u["apellido"]) if x) or "Anónimo"

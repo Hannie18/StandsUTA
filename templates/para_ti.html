@@ -1,16 +1,15 @@
 {% extends "app_base.html" %}
 {% block titulo %}Para ti · StandsUTA{% endblock %}
+
 {% block contenido %}
-  <!-- Tu cabecera original -->
   <header class="barra-sup">
     <h1>Para ti</h1>
   </header>
 
-  <!-- Grilla del Feed -->
   <div class="feed-publicaciones">
     {% for pub in publicaciones %}
-      <article class="tarjeta-post">
-        <!-- Cabecera: Autor y botón de borrar -->
+      <article class="tarjeta-post" id="post-{{ pub.id }}">
+        <!-- Cabecera del Post -->
         <header class="post-cabecera">
           <a href="{{ url_for('perfil_publico', username=pub.username) }}" class="post-autor">
             {% if pub.usuario_foto %}
@@ -22,13 +21,16 @@
           </a>
           
           {% if pub.usuario_id == session['user_id'] %}
-            <form action="{{ url_for('borrar_publicacion', pub_id=pub.id) }}" method="post" onsubmit="return confirm('¿Seguro que quieres borrar este Stand?');">
-              <button type="submit" class="boton-sec" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; border-color: var(--rojo); color: var(--rojo);">Borrar</button>
-            </form>
+            <div class="acciones-dueno">
+              <a href="{{ url_for('editar_publicacion', pub_id=pub.id) }}" class="boton-sec btn-sm">Editar</a>
+              <form action="{{ url_for('borrar_publicacion', pub_id=pub.id) }}" method="post" onsubmit="return confirm('¿Seguro que quieres borrar este Stand?');">
+                <button type="submit" class="boton-sec btn-sm btn-borrar">Borrar</button>
+              </form>
+            </div>
           {% endif %}
         </header>
 
-<!-- Contenido Multimedia -->
+        <!-- Contenido Multimedia -->
         {% if pub.archivo_multimedia %}
           <div class="post-media">
             {% if pub.es_video %}
@@ -39,12 +41,21 @@
           </div>
         {% endif %}
 
-        <!-- Interacciones y Descripción -->
+        <!-- Detalles e Interacciones -->
         <div class="post-info">
           <div class="acciones-post">
-            <button class="icono-btn" title="Me gusta">❤️</button>
-            <button class="icono-btn" title="Comentar">💬</button>
-            <button class="icono-btn" title="Guardar">🔖</button>
+            <button class="icono-btn btn-like" type="button" onclick="toggleLike({{ pub.id }})" title="Me gusta">
+              <span id="heart-{{ pub.id }}">{{ '❤️' if pub.dio_like else '🤍' }}</span>
+              <span id="likes-count-{{ pub.id }}" class="conteo-likes">{{ pub.total_likes }}</span>
+            </button>
+            
+            <button class="icono-btn" type="button" onclick="document.getElementById('input-comentario-{{ pub.id }}').focus()" title="Comentar">💬</button>
+            
+            <button class="icono-btn btn-share" type="button" onclick="compartirStand('{{ url_for('perfil_publico', username=pub.username, _external=True) }}')" title="Compartir">🔗</button>
+            
+            <button class="icono-btn btn-save btn-guardar-right" type="button" onclick="toggleGuardar({{ pub.id }})" title="Guardar">
+              <span id="bookmark-{{ pub.id }}">{{ '🔖' if pub.esta_guardado else '📑' }}</span>
+            </button>
           </div>
           
           {% if pub.descripcion %}
@@ -57,14 +68,54 @@
               {% if pub.musica %}🎵 {{ pub.musica }}{% endif %}
             </p>
           {% endif %}
+
+          <!-- Lista de Comentarios -->
+          <div class="lista-comentarios">
+            {% for com in pub.comentarios %}
+              <p class="item-comentario"><strong>@{{ com.username }}</strong> {{ com.texto }}</p>
+            {% endfor %}
+          </div>
+
+          <!-- Formulario de Comentario -->
+          <form action="{{ url_for('comentar', pub_id=pub.id) }}" method="post" class="form-comentario">
+            <input type="text" id="input-comentario-{{ pub.id }}" name="texto" placeholder="Añade un comentario..." required class="input-comentario">
+            <button type="submit" class="boton btn-comentar">Publicar</button>
+          </form>
         </div>
       </article>
     {% else %}
-      <!-- Tu mensaje original si no hay publicaciones -->
       <section class="vacio">
         <p><strong>Todavía no hay nada por aquí</strong></p>
         <p>Mientras llegan las primeras publicaciones, <a href="{{ url_for('editar_perfil') }}">completa tu perfil</a>.</p>
       </section>
     {% endfor %}
   </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  async function toggleLike(pubId) {
+    const res = await fetch('/like/' + pubId, { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      document.getElementById('heart-' + pubId).textContent = data.le_gusta ? '❤️' : '🤍';
+      document.getElementById('likes-count-' + pubId).textContent = data.total;
+    }
+  }
+
+  async function toggleGuardar(pubId) {
+    const res = await fetch('/guardar/' + pubId, { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      document.getElementById('bookmark-' + pubId).textContent = data.guardado ? '🔖' : '📑';
+    }
+  }
+
+  function compartirStand(url) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+      alert('¡Enlace del Stand copiado al portapapeles!');
+    }
+  }
+</script>
 {% endblock %}

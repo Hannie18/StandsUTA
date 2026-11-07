@@ -1,0 +1,21 @@
+{% extends "app_base.html" %}
+{% block titulo %}Editar Stand · StandsUTA{% endblock %}
+{% block contenido %}
+  <h1>Editar Stand</h1>
+  
+  <form method="post" class="formulario">
+    <label for="descripcion">Descripción</label>
+    <textarea id="descripcion" name="descripcion" rows="4">{{ pub.descripcion or '' }}</textarea>
+
+    <label for="ubicacion">Ubicación</label>
+    <input type="text" id="ubicacion" name="ubicacion" value="{{ pub.ubicacion or '' }}">
+
+    <label for="musica">Música</label>
+    <input type="text" id="musica" name="musica" value="{{ pub.musica or '' }}">
+
+    <div class="acciones-form" style="display: flex; gap: 1rem; margin-top: 1rem;">
+      <button class="boton" type="submit">Guardar Cambios</button>
+      <a href="{{ url_for('perfil') }}" class="boton-sec">Cancelar</a>
+    </div>
+  </form>
+{% endblock %}
