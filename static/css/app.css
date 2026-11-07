@@ -147,6 +147,80 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
+
+/* Tarjetas del Feed (Para ti) */
+.feed-publicaciones {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.tarjeta-post {
+  background: #fff;
+  border: 1px solid #f2b8bd;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.post-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid #fff0f1;
+}
+
+.post-autor {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  text-decoration: none;
+  color: var(--negro);
+}
+
+.post-autor img, .avatar-min {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--vino);
+  color: var(--rosa);
+  display: grid;
+  place-items: center;
+  font-weight: bold;
+}
+
+.post-media img, .post-media video {
+  width: 100%;
+  max-height: 600px;
+  object-fit: contain;
+  background: #000;
+  display: block;
+}
+
+.post-info {
+  padding: 1rem;
+}
+
+.acciones-post {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.post-desc {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  margin-bottom: 0.5rem;
+}
+
+.post-meta {
+  font-size: 0.8rem;
+  color: #6b4a47;
+}
+
 /* Móvil: la navegación pasa abajo */
 @media (max-width: 820px) {
   .app { grid-template-columns: 1fr; }

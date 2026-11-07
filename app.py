@@ -160,12 +160,50 @@ def salir():
     return redirect(url_for("login"))
 
 
-# ---------- Para ti ----------
+# ---------- Para ti (Feed) ----------
 @app.route("/inicio")
 @login_requerido
 def inicio():
-    return render_template("para_ti.html", seccion="inicio")
+    db = get_db()
+    with db.cursor() as cur:
+        # Extraemos todas las publicaciones y los datos del autor
+        cur.execute("""
+            SELECT p.*, u.username, u.foto AS usuario_foto 
+            FROM publicaciones p 
+            JOIN usuarios u ON p.usuario_id = u.id 
+            ORDER BY p.creado_en DESC
+        """)
+        publicaciones = cur.fetchall()
+    db.close()
+    return render_template("para_ti.html", publicaciones=publicaciones, seccion="inicio")
 
+# ---------- Borrar Publicación ----------
+@app.route("/borrar_publicacion/<int:pub_id>", methods=["POST"])
+@login_requerido
+def borrar_publicacion(pub_id):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT usuario_id, archivo_multimedia FROM publicaciones WHERE id=%s", (pub_id,))
+        pub = cur.fetchone()
+        
+        # Verifica que la publicación exista y que el usuario actual sea el dueño
+        if pub and pub["usuario_id"] == session["user_id"]:
+            cur.execute("DELETE FROM publicaciones WHERE id=%s", (pub_id,))
+            db.commit()
+            
+            # Borra el archivo físico del servidor para no ocupar espacio basura
+            if pub["archivo_multimedia"]:
+                try:
+                    os.remove(os.path.join(CARPETA_FOTOS, pub["archivo_multimedia"]))
+                except OSError:
+                    pass
+            flash("Stand borrado correctamente.", "ok")
+        else:
+            flash("No tienes permiso para borrar esta publicación.", "error")
+            
+    db.close()
+    # Devuelve al usuario a la página donde estaba (perfil o inicio)
+    return redirect(request.referrer or url_for("inicio"))
 
 # ---------- Perfil ----------
 def mostrar_perfil(u):

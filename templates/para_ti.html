@@ -1,9 +1,68 @@
 {% extends "app_base.html" %}
 {% block titulo %}Para ti · StandsUTA{% endblock %}
 {% block contenido %}
-  <header class="barra-sup"><h1>Para ti</h1></header>
-  <section class="vacio">
-    <p><strong>Todavía no hay nada por aquí</strong></p>
-    <p>Mientras llegan las primeras publicaciones, <a href="{{ url_for('editar_perfil') }}">completa tu perfil</a>.</p>
-  </section>
+  <!-- Tu cabecera original -->
+  <header class="barra-sup">
+    <h1>Para ti</h1>
+  </header>
+
+  <!-- Grilla del Feed -->
+  <div class="feed-publicaciones">
+    {% for pub in publicaciones %}
+      <article class="tarjeta-post">
+        <!-- Cabecera: Autor y botón de borrar -->
+        <header class="post-cabecera">
+          <a href="{{ url_for('perfil_publico', username=pub.username) }}" class="post-autor">
+            {% if pub.usuario_foto %}
+              <img src="{{ url_for('static', filename='uploads/' ~ pub.usuario_foto) }}" alt="Foto de @{{ pub.username }}">
+            {% else %}
+              <div class="avatar-min">U</div>
+            {% endif %}
+            <strong>@{{ pub.username }}</strong>
+          </a>
+          
+          {% if pub.usuario_id == session['user_id'] %}
+            <form action="{{ url_for('borrar_publicacion', pub_id=pub.id) }}" method="post" onsubmit="return confirm('¿Seguro que quieres borrar este Stand?');">
+              <button type="submit" class="boton-sec" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; border-color: var(--rojo); color: var(--rojo);">Borrar</button>
+            </form>
+          {% endif %}
+        </header>
+
+        <!-- Contenido Multimedia -->
+        <div class="post-media">
+          {% if pub.es_video %}
+            <video src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" controls></video>
+          {% else %}
+            <img src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" alt="Stand de @{{ pub.username }}">
+          {% endif %}
+        </div>
+
+        <!-- Interacciones y Descripción -->
+        <div class="post-info">
+          <div class="acciones-post">
+            <button class="icono-btn" title="Me gusta">❤️</button>
+            <button class="icono-btn" title="Comentar">💬</button>
+            <button class="icono-btn" title="Guardar">🔖</button>
+          </div>
+          
+          {% if pub.descripcion %}
+            <p class="post-desc"><strong>@{{ pub.username }}</strong> {{ pub.descripcion }}</p>
+          {% endif %}
+          
+          {% if pub.ubicacion or pub.musica %}
+            <p class="post-meta">
+              {% if pub.ubicacion %}📍 {{ pub.ubicacion }} &nbsp;{% endif %}
+              {% if pub.musica %}🎵 {{ pub.musica }}{% endif %}
+            </p>
+          {% endif %}
+        </div>
+      </article>
+    {% else %}
+      <!-- Tu mensaje original si no hay publicaciones -->
+      <section class="vacio">
+        <p><strong>Todavía no hay nada por aquí</strong></p>
+        <p>Mientras llegan las primeras publicaciones, <a href="{{ url_for('editar_perfil') }}">completa tu perfil</a>.</p>
+      </section>
+    {% endfor %}
+  </div>
 {% endblock %}
