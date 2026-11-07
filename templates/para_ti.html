@@ -28,14 +28,16 @@
           {% endif %}
         </header>
 
-        <!-- Contenido Multimedia -->
-        <div class="post-media">
-          {% if pub.es_video %}
-            <video src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" controls></video>
-          {% else %}
-            <img src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" alt="Stand de @{{ pub.username }}">
-          {% endif %}
-        </div>
+<!-- Contenido Multimedia -->
+        {% if pub.archivo_multimedia %}
+          <div class="post-media">
+            {% if pub.es_video %}
+              <video src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" controls></video>
+            {% else %}
+              <img src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" alt="Stand de @{{ pub.username }}">
+            {% endif %}
+          </div>
+        {% endif %}
 
         <!-- Interacciones y Descripción -->
         <div class="post-info">
