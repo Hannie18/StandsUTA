@@ -109,7 +109,7 @@
 {% block scripts %}
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    // Manejo de Likes
+    // Likes
     document.querySelectorAll('.btn-like').forEach(btn => {
       btn.addEventListener('click', async () => {
         const pubId = btn.getAttribute('data-id');
@@ -122,7 +122,7 @@
       });
     });
 
-    // Manejo de Guardados
+    // Guardados
     document.querySelectorAll('.btn-save').forEach(btn => {
       btn.addEventListener('click', async () => {
         const pubId = btn.getAttribute('data-id');
@@ -134,12 +134,15 @@
       });
     });
 
-    // Enfocar comentario
+    // Clic en icono de Comentario (enfoca la caja de texto)
     document.querySelectorAll('.btn-comentar-focus').forEach(btn => {
       btn.addEventListener('click', () => {
         const pubId = btn.getAttribute('data-id');
         const campo = document.getElementById('input-comentario-' + pubId);
-        if (campo) campo.focus();
+        if (campo) {
+          campo.focus();
+          campo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
       });
     });
 

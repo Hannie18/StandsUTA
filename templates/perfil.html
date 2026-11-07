@@ -52,10 +52,14 @@
     {% for pub in publicaciones %}
       <div class="stand-item item-perfil-media" 
            style="cursor: pointer;"
+           data-id="{{ pub.id }}"
            data-url="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}"
            data-video="{{ pub.es_video }}"
            data-desc="{{ pub.descripcion or '' }}"
-           data-autor="@{{ u.username }}">
+           data-autor="@{{ u.username }}"
+           data-likes="{{ pub.total_likes or 0 }}"
+           data-liked="{{ pub.dio_like or false }}"
+           data-saved="{{ pub.esta_guardado or false }}">
         {% if pub.es_video %}
           <video src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" muted loop playsinline></video>
         {% else %}
@@ -85,12 +89,28 @@
     </div>
   </dialog>
 
-  <!-- Dialog / Modal para ver la publicación en pantalla grande -->
+  <!-- Dialog / Modal completo con interacciones para Perfil -->
   <dialog id="modal-ver-media" class="modal-media-dialog">
     <div class="contenedor-modal-media">
       <button type="button" class="cerrar-modal" id="btn-cerrar-media-perfil">&times;</button>
       <div id="media-target"></div>
-      <p id="desc-modal" class="desc-modal"></p>
+      
+      <div class="post-info" style="width: 100%; text-align: left; margin-top: 0.8rem;">
+        <div class="acciones-post">
+          <button class="icono-btn btn-like-modal" type="button" id="modal-btn-like" title="Me gusta">
+            <span id="modal-heart">🤍</span>
+            <span id="modal-likes-count" class="conteo-likes">0</span>
+          </button>
+          
+          <button class="icono-btn btn-share-modal" type="button" id="modal-btn-share" title="Compartir">🔗</button>
+          
+          <button class="icono-btn btn-save-modal btn-guardar-right" type="button" id="modal-btn-save" title="Guardar">
+            <span id="modal-bookmark">📑</span>
+          </button>
+        </div>
+        
+        <p id="desc-modal" class="post-desc" style="margin-top: 0.5rem;"></p>
+      </div>
     </div>
   </dialog>
 {% endblock %}
@@ -117,29 +137,80 @@
       });
     }
 
-    // Multimedia Modal en Perfil
+    // Modal de Multimedia e Interacciones en Perfil
     const modalMedia = document.getElementById('modal-ver-media');
     const mediaTarget = document.getElementById('media-target');
     const descModal = document.getElementById('desc-modal');
     const btnCerrarMedia = document.getElementById('btn-cerrar-media-perfil');
+    
+    const modalBtnLike = document.getElementById('modal-btn-like');
+    const modalHeart = document.getElementById('modal-heart');
+    const modalLikesCount = document.getElementById('modal-likes-count');
+    const modalBtnSave = document.getElementById('modal-btn-save');
+    const modalBookmark = document.getElementById('modal-bookmark');
+    const modalBtnShare = document.getElementById('modal-btn-share');
+
+    let currentPubId = null;
 
     document.querySelectorAll('.item-perfil-media').forEach(item => {
       item.addEventListener('click', () => {
+        currentPubId = item.getAttribute('data-id');
         const url = item.getAttribute('data-url');
         const esVideo = item.getAttribute('data-video');
         const descripcion = item.getAttribute('data-desc');
         const autor = item.getAttribute('data-autor');
+        
+        let likes = parseInt(item.getAttribute('data-likes') || '0', 10);
+        let liked = item.getAttribute('data-liked') === 'true' || item.getAttribute('data-liked') === 'True';
+        let saved = item.getAttribute('data-saved') === 'true' || item.getAttribute('data-saved') === 'True';
 
         const esVid = (esVideo === 'True' || esVideo === '1' || esVideo === 'true');
         if (esVid) {
-          mediaTarget.innerHTML = `<video src="${url}" controls autoplay loop style="max-width:100%; max-height:70vh; border-radius:8px;"></video>`;
+          mediaTarget.innerHTML = `<video src="${url}" controls autoplay loop style="max-width:100%; max-height:60vh; border-radius:8px;"></video>`;
         } else {
-          mediaTarget.innerHTML = `<img src="${url}" alt="Stand" style="max-width:100%; max-height:70vh; object-fit:contain; border-radius:8px;">`;
+          mediaTarget.innerHTML = `<img src="${url}" alt="Stand" style="max-width:100%; max-height:60vh; object-fit:contain; border-radius:8px;">`;
         }
-        descModal.textContent = descripcion ? `${autor}: ${descripcion}` : autor;
+
+        descModal.innerHTML = `<strong>${autor}</strong> ${descripcion}`;
+        modalHeart.textContent = liked ? '❤️' : '🤍';
+        modalLikesCount.textContent = likes;
+        modalBookmark.textContent = saved ? '🔖' : '📑';
+
         if (modalMedia) modalMedia.showModal();
       });
     });
+
+    if (modalBtnLike) {
+      modalBtnLike.addEventListener('click', async () => {
+        if (!currentPubId) return;
+        const res = await fetch('/like/' + currentPubId, { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          modalHeart.textContent = data.le_gusta ? '❤️' : '🤍';
+          modalLikesCount.textContent = data.total;
+        }
+      });
+    }
+
+    if (modalBtnSave) {
+      modalBtnSave.addEventListener('click', async () => {
+        if (!currentPubId) return;
+        const res = await fetch('/guardar/' + currentPubId, { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          modalBookmark.textContent = data.guardado ? '🔖' : '📑';
+        }
+      });
+    }
+
+    if (modalBtnShare) {
+      modalBtnShare.addEventListener('click', () => {
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(window.location.href);
+          alert('¡Enlace del perfil copiado al portapapeles!');
+        }
+      });
+    }
 
     function cerrarMedia() {
       if (mediaTarget) mediaTarget.innerHTML = '';
