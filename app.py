@@ -160,23 +160,38 @@ def salir():
     return redirect(url_for("login"))
 
 
-# ---------- Para ti (Feed) ----------
+# ---------- Para ti (Feed Global) ----------
 @app.route("/inicio")
 @login_requerido
 def inicio():
+    user_id = session["user_id"]
     db = get_db()
     with db.cursor() as cur:
-        # Extraemos todas las publicaciones y los datos del autor
+        # Extraemos TODAS las publicaciones de TODOS los usuarios
         cur.execute("""
-            SELECT p.*, u.username, u.foto AS usuario_foto 
-            FROM publicaciones p 
-            JOIN usuarios u ON p.usuario_id = u.id 
+            SELECT p.*, u.username, u.foto AS usuario_foto,
+              (SELECT COUNT(*) FROM me_gusta WHERE publicacion_id = p.id) AS total_likes,
+              (SELECT COUNT(*) FROM me_gusta WHERE publicacion_id = p.id AND usuario_id = %s) AS dio_like,
+              (SELECT COUNT(*) FROM guardados WHERE publicacion_id = p.id AND usuario_id = %s) AS esta_guardado
+            FROM publicaciones p
+            JOIN usuarios u ON p.usuario_id = u.id
             ORDER BY p.creado_en DESC
-        """)
+        """, (user_id, user_id))
         publicaciones = cur.fetchall()
+
+        # Cargar comentarios para cada publicación en el Feed
+        for p in publicaciones:
+            cur.execute("""
+                SELECT c.texto, c.creado_en, u.username 
+                FROM comentarios c 
+                JOIN usuarios u ON c.usuario_id = u.id 
+                WHERE c.publicacion_id = %s 
+                ORDER BY c.creado_en ASC
+            """, (p["id"],))
+            p["comentarios"] = cur.fetchall()
+            
     db.close()
     return render_template("para_ti.html", publicaciones=publicaciones, seccion="inicio")
-
 # ---------- Borrar Publicación ----------
 @app.route("/borrar_publicacion/<int:pub_id>", methods=["POST"])
 @login_requerido
@@ -309,17 +324,25 @@ def mostrar_perfil(u):
     )
 
 # ---------- Ruta Perfil en app.py ----------
-@app.route("/perfil")
+# ---------- Perfil Público (Ver otros usuarios) ----------
+@app.route("/perfil/<username>")
 @login_requerido
-def perfil():
-    user_id = session["user_id"]
+def perfil_publico(username):
+    user_actual_id = session["user_id"]
     db = get_db()
     with db.cursor() as cur:
-        # 1. Información del usuario
-        cur.execute("SELECT * FROM usuarios WHERE id = %s", (user_id,))
+        # Buscar al usuario del perfil que estamos visitando
+        cur.execute("SELECT * FROM usuarios WHERE username = %s", (username,))
         u = cur.fetchone()
+        
+        if not u:
+            db.close()
+            flash("Usuario no encontrado.", "error")
+            return redirect(url_for("inicio"))
 
-        # 2. Publicaciones con métricas e interacciones
+        es_mio = (u["id"] == user_actual_id)
+
+        # Cargar las publicaciones de ESE usuario con las métricas del usuario en sesión
         cur.execute("""
             SELECT p.*,
               (SELECT COUNT(*) FROM me_gusta WHERE publicacion_id = p.id) AS total_likes,
@@ -328,11 +351,10 @@ def perfil():
             FROM publicaciones p
             WHERE p.usuario_id = %s
             ORDER BY p.creado_en DESC
-        """, (user_id, user_id, user_id))
+        """, (user_actual_id, user_actual_id, u["id"]))
         publicaciones = cur.fetchall()
 
-        # 3. Cargar comentarios limpios
-        import json
+        # Formatear comentarios en JSON
         for p in publicaciones:
             cur.execute("""
                 SELECT c.texto, u.username 
@@ -342,12 +364,10 @@ def perfil():
                 ORDER BY c.creado_en ASC
             """, (p["id"],))
             coms = cur.fetchall()
-            # Guardamos la lista en formato JSON seguro
             p["comentarios_json"] = json.dumps(coms)
 
     db.close()
-    return render_template("perfil.html", u=u, publicaciones=publicaciones, es_mio=True)
-
+    return render_template("perfil.html", u=u, publicaciones=publicaciones, es_mio=es_mio)
 @app.route("/u/<username>")
 @login_requerido
 def perfil_publico(username):
