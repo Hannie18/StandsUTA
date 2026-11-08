@@ -19,6 +19,8 @@ import cloudinary
 import cloudinary.uploader
 from dotenv import load_dotenv
 
+from datetime import datetime, timedelta
+
 load_dotenv()
 
 # Configurar Cloudinary
@@ -368,22 +370,33 @@ def perfil_publico(username):
             return redirect(url_for("inicio"))
 
         es_mio = (u["id"] == user_actual_id)
-        nombre = " ".join(x for x in (u["nombre"], u["apellido"]) if x) or "Anónimo"
-        enlaces = [{"url": url, "texto": urlparse(url).netloc.removeprefix("www.")}
-                   for url in json.loads(u["enlaces"] or "[]")]
+        nombre = " ".join(x for x in (u.get("nombre"), u.get("apellido")) if x) or "Anónimo"
+        
+        # Manejo seguro de enlaces
+        enlaces = []
+        if u.get("enlaces"):
+            try:
+                raw_enlaces = json.loads(u["enlaces"])
+                for url in raw_enlaces:
+                    texto_url = url.replace("https://", "").replace("http://", "").replace("www.", "")
+                    enlaces.append({"url": url, "texto": texto_url})
+            except Exception:
+                enlaces = []
 
         # 2. Contadores de Seguidores y Seguidos
         cur.execute("SELECT COUNT(*) AS total FROM seguidores WHERE seguido_id = %s", (u["id"],))
-        total_seguidores = cur.fetchone()["total"]
+        res_seg = cur.fetchone()
+        total_seguidores = res_seg["total"] if res_seg else 0
 
         cur.execute("SELECT COUNT(*) AS total FROM seguidores WHERE seguidor_id = %s", (u["id"],))
-        total_seguidos = cur.fetchone()["total"]
+        res_sig = cur.fetchone()
+        total_seguidos = res_sig["total"] if res_sig else 0
 
         # 3. Verificar si el usuario actual ya sigue a este perfil
         cur.execute("SELECT 1 FROM seguidores WHERE seguidor_id = %s AND seguido_id = %s", (user_actual_id, u["id"]))
         lo_sigo = bool(cur.fetchone())
 
-        # 4. Cargar publicaciones con comentarios corregidos
+        # 4. Cargar publicaciones con comentarios
         cur.execute("""
             SELECT p.*,
               (SELECT COUNT(*) FROM me_gusta WHERE publicacion_id = p.id) AS total_likes,
@@ -404,16 +417,53 @@ def perfil_publico(username):
                 ORDER BY c.creado_en ASC
             """, (p["id"],))
             coms = cur.fetchall()
-            # Aseguramos formato JSON limpio para los comentarios
             p["comentarios_json"] = json.dumps(coms)
 
+        # 5. NUEVA SECCIÓN: Cargar datos para el Modal de Configuración ⚙️ (Si es el propio perfil)
+        cuentas_vinculadas = []
+        publicaciones_guardadas = []
+        calendario_fotos = []
+
+        if es_mio:
+            # 5.1. Cuentas vinculadas por el mismo correo
+            cur.execute("SELECT id, username, foto FROM usuarios WHERE email = %s AND id != %s", (u["email"], u["id"]))
+            cuentas_vinculadas = cur.fetchall()
+
+            # 5.2. Publicaciones guardadas (Favoritos)
+            cur.execute("""
+                SELECT p.*, u.username FROM publicaciones p
+                JOIN guardados g ON p.id = g.publicacion_id
+                JOIN usuarios u ON p.usuario_id = u.id
+                WHERE g.usuario_id = %s
+                ORDER BY g.creado_en DESC
+            """, (u["id"],))
+            publicaciones_guardadas = cur.fetchall()
+
+            # 5.3. Biblioteca / Calendario por fecha de publicación
+            cur.execute("""
+                SELECT id, archivo_multimedia, es_video, DATE_FORMAT(creado_en, '%%d/%%m/%%Y') AS fecha_formateada
+                FROM publicaciones 
+                WHERE usuario_id = %s
+                ORDER BY creado_en DESC
+            """, (u["id"],))
+            calendario_fotos = cur.fetchall()
+
     db.close()
+
+    # Mapeo seguro del sexo
+    sexo_texto = u.get("sexo", "")
+    if sexo_texto == "F": sexo_texto = "Femenino"
+    elif sexo_texto == "M": sexo_texto = "Masculino"
+
     return render_template(
         "perfil.html", u=u, publicaciones=publicaciones, es_mio=es_mio,
-        nombre_completo=nombre, enlaces=enlaces, sexo=SEXOS.get(u["sexo"]),
+        nombre_completo=nombre, enlaces=enlaces, sexo=sexo_texto,
         seccion="perfil" if es_mio else "",
         total_seguidores=total_seguidores, total_seguidos=total_seguidos, lo_sigo=lo_sigo,
-        url_perfil=url_for("perfil_publico", username=u["username"], _external=True)
+        url_perfil=url_for("perfil_publico", username=u["username"], _external=True),
+        cuentas_vinculadas=cuentas_vinculadas,
+        publicaciones_guardadas=publicaciones_guardadas,
+        calendario_fotos=calendario_fotos
     )
 
 #-------------- PERFIL -----------------
@@ -692,3 +742,86 @@ def seguir_usuario(perfil_id):
 
     db.close()
     return {"status": "ok", "siguiendo": siguiendo, "total_seguidores": total_seguidores}
+
+
+# -------- CONTORLAR CAMBIO DE CUENTA Y LIMITE DE TIEMPO ------------------------
+
+
+# 1. Ajustes / Guardar límite de tiempo
+@app.route("/configuracion/tiempo", methods=["POST"])
+@login_requerido
+def configurar_tiempo():
+    minutos = int(request.form.get("limite_tiempo", 0))
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("UPDATE usuarios SET limite_tiempo=%s WHERE id=%s", (minutos, session["user_id"]))
+        db.commit()
+    db.close()
+    flash("Límite de tiempo actualizado.", "ok")
+    return redirect(url_for("perfil"))
+
+# 2. Cambiar de cuenta (Gestor de Cuentas por mismo Email)
+@app.route("/configuracion/cambiar_cuenta/<int:nuevo_user_id>", methods=["POST"])
+@login_requerido
+def cambiar_cuenta(nuevo_user_id):
+    user_actual = obtener_usuario("id", session["user_id"])
+    db = get_db()
+    with db.cursor() as cur:
+        # Verificar que el usuario destino tenga el mismo email
+        cur.execute("SELECT id, username, email FROM usuarios WHERE id=%s AND email=%s", (nuevo_user_id, user_actual["email"]))
+        cuenta_destino = cur.fetchone()
+        
+    db.close()
+    if cuenta_destino:
+        session["user_id"] = cuenta_destino["id"]
+        session["username"] = cuenta_destino["username"]
+        flash(f"Cambiado a la cuenta @{cuenta_destino['username']}", "ok")
+    else:
+        flash("No puedes cambiar a esta cuenta.", "error")
+    return redirect(url_for("perfil"))
+
+# 3. Middleware para controlar el tiempo de uso del sitio web
+@app.before_request
+def verificar_bloqueo_tiempo():
+    if "user_id" in session and request.endpoint not in ["salir", "static"]:
+        user_id = session["user_id"]
+        
+        # Verificar si hay bloqueo de 12 horas activo
+        bloqueado_hasta = session.get("bloqueado_hasta")
+        if bloqueado_hasta:
+            hasta_dt = datetime.fromisoformat(bloqueado_hasta)
+            if datetime.now() < hasta_dt:
+                restante = hasta_dt - datetime.now()
+                horas = int(restante.total_seconds() // 3600)
+                minutos = int((restante.total_seconds() % 3600) // 60)
+                return f"""
+                <div style="text-align:center; padding: 3rem; font-family: sans-serif;">
+                    <h1>⏳ Tiempo de uso agotado</h1>
+                    <p>Has alcanzado el límite diario que configuraste en StandsUTA.</p>
+                    <p>La plataforma permanecerá bloqueada por <strong>{horas}h {minutos}m</strong> más.</p>
+                    <a href="/salir" style="color: #c00;">Cerrar sesión</a>
+                </div>
+                """, 403
+            else:
+                session.pop("bloqueado_hasta", None)
+                session["tiempo_inicio"] = datetime.now().isoformat()
+
+        # Iniciar cronómetro si no existe
+        if "tiempo_inicio" not in session:
+            session["tiempo_inicio"] = datetime.now().isoformat()
+
+        # Verificar si superó su límite de tiempo
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("SELECT limite_tiempo FROM usuarios WHERE id=%s", (user_id,))
+            res = cur.fetchone()
+            limite = res["limite_tiempo"] if res else 0
+        db.close()
+
+        if limite > 0:
+            inicio_dt = datetime.fromisoformat(session["tiempo_inicio"])
+            transcurrido_minutos = (datetime.now() - inicio_dt).total_seconds() / 60
+            if transcurrido_minutos >= limite:
+                desbloqueo = (datetime.now() + timedelta(hours=12)).isoformat()
+                session["bloqueado_hasta"] = desbloqueo
+                return redirect(request.url)
