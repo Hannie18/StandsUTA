@@ -59,7 +59,8 @@
            data-autor="@{{ u.username }}"
            data-likes="{{ pub.total_likes or 0 }}"
            data-liked="{{ pub.dio_like or false }}"
-           data-saved="{{ pub.esta_guardado or false }}">
+           data-saved="{{ pub.esta_guardado or false }}"
+           data-comentarios='{{ pub.comentarios_json }}'>
         {% if pub.es_video %}
           <video src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" muted loop playsinline></video>
         {% else %}
@@ -89,7 +90,7 @@
     </div>
   </dialog>
 
-  <!-- Dialog / Modal completo con interacciones para Perfil -->
+  <!-- Ventana Flotante Centrada -->
   <dialog id="modal-ver-media" class="modal-media-dialog">
     <div class="contenedor-modal-media">
       <button type="button" class="cerrar-modal" id="btn-cerrar-media-perfil">&times;</button>
@@ -110,6 +111,15 @@
         </div>
         
         <p id="desc-modal" class="post-desc" style="margin-top: 0.5rem;"></p>
+
+        <!-- Lista de Comentarios en el Modal del Perfil -->
+        <div id="modal-lista-comentarios" class="lista-comentarios" style="margin-top: 0.8rem;"></div>
+
+        <!-- Formulario para Comentar desde el Modal del Perfil -->
+        <form id="modal-form-comentario" method="post" class="form-comentario" style="margin-top: 0.8rem;">
+          <input type="text" name="texto" placeholder="Añade un comentario..." required class="input-comentario">
+          <button type="submit" class="boton btn-comentar">Publicar</button>
+        </form>
       </div>
     </div>
   </dialog>
@@ -137,10 +147,12 @@
       });
     }
 
-    // Modal de Multimedia e Interacciones en Perfil
+    // Modal de Multimedia en Perfil
     const modalMedia = document.getElementById('modal-ver-media');
     const mediaTarget = document.getElementById('media-target');
     const descModal = document.getElementById('desc-modal');
+    const modalListaComentarios = document.getElementById('modal-lista-comentarios');
+    const modalFormComentario = document.getElementById('modal-form-comentario');
     const btnCerrarMedia = document.getElementById('btn-cerrar-media-perfil');
     
     const modalBtnLike = document.getElementById('modal-btn-like');
@@ -164,17 +176,37 @@
         let liked = item.getAttribute('data-liked') === 'true' || item.getAttribute('data-liked') === 'True';
         let saved = item.getAttribute('data-saved') === 'true' || item.getAttribute('data-saved') === 'True';
 
+        // Cargar comentarios
+        let comentarios = [];
+        try {
+          comentarios = JSON.parse(item.getAttribute('data-comentarios') || '[]');
+        } catch (err) {
+          comentarios = [];
+        }
+
         const esVid = (esVideo === 'True' || esVideo === '1' || esVideo === 'true');
         if (esVid) {
-          mediaTarget.innerHTML = `<video src="${url}" controls autoplay loop style="max-width:100%; max-height:60vh; border-radius:8px;"></video>`;
+          mediaTarget.innerHTML = `<video src="${url}" controls autoplay loop style="max-width:100%; max-height:50vh; border-radius:8px;"></video>`;
         } else {
-          mediaTarget.innerHTML = `<img src="${url}" alt="Stand" style="max-width:100%; max-height:60vh; object-fit:contain; border-radius:8px;">`;
+          mediaTarget.innerHTML = `<img src="${url}" alt="Stand" style="max-width:100%; max-height:50vh; object-fit:contain; border-radius:8px;">`;
         }
 
         descModal.innerHTML = `<strong>${autor}</strong> ${descripcion}`;
         modalHeart.textContent = liked ? '❤️' : '🤍';
         modalLikesCount.textContent = likes;
         modalBookmark.textContent = saved ? '🔖' : '📑';
+
+        // Renderizar lista de comentarios
+        if (comentarios.length > 0) {
+          modalListaComentarios.innerHTML = comentarios.map(c => `<p class="item-comentario"><strong>@${c.username}</strong> ${c.texto}</p>`).join('');
+        } else {
+          modalListaComentarios.innerHTML = '<p class="ayuda" style="font-size:0.85rem; padding: 0.4rem 0;">Aún no hay comentarios en este Stand.</p>';
+        }
+
+        // Asignar ruta al formulario de comentario
+        if (modalFormComentario) {
+          modalFormComentario.action = '/comentar/' + currentPubId;
+        }
 
         if (modalMedia) modalMedia.showModal();
       });

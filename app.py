@@ -308,18 +308,18 @@ def mostrar_perfil(u):
         publicaciones=publicaciones
     )
 
-# ---------- Ruta Perfil ----------
+# ---------- Ruta Perfil en app.py ----------
 @app.route("/perfil")
 @login_requerido
 def perfil():
     user_id = session["user_id"]
     db = get_db()
     with db.cursor() as cur:
-        # Traer usuario actual
+        # 1. Información del usuario
         cur.execute("SELECT * FROM usuarios WHERE id = %s", (user_id,))
         u = cur.fetchone()
 
-        # Traer publicaciones con métricas e interacciones
+        # 2. Publicaciones con métricas e interacciones
         cur.execute("""
             SELECT p.*,
               (SELECT COUNT(*) FROM me_gusta WHERE publicacion_id = p.id) AS total_likes,
@@ -331,16 +331,19 @@ def perfil():
         """, (user_id, user_id, user_id))
         publicaciones = cur.fetchall()
 
-        # Cargar comentarios de cada publicación del perfil
+        # 3. Cargar comentarios limpios
+        import json
         for p in publicaciones:
             cur.execute("""
-                SELECT c.texto, c.creado_en, u.username 
+                SELECT c.texto, u.username 
                 FROM comentarios c 
                 JOIN usuarios u ON c.usuario_id = u.id 
                 WHERE c.publicacion_id = %s 
                 ORDER BY c.creado_en ASC
             """, (p["id"],))
-            p["comentarios"] = cur.fetchall()
+            coms = cur.fetchall()
+            # Guardamos la lista en formato JSON seguro
+            p["comentarios_json"] = json.dumps(coms)
 
     db.close()
     return render_template("perfil.html", u=u, publicaciones=publicaciones, es_mio=True)
