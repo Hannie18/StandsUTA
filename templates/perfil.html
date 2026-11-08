@@ -18,13 +18,26 @@
     {% endif %}
     <ul class="cifras">
       <li><strong>{{ publicaciones|length }}</strong><span>publicaciones</span></li>
-      <li><strong>0</strong><span>seguidores</span></li>
-      <li><strong>0</strong><span>seguidos</span></li>
+      <li><strong id="contador-seguidores">{{ total_seguidores or 0 }}</strong><span>seguidores</span></li>
+      <li><strong>{{ total_seguidos or 0 }}</strong><span>seguidos</span></li>
     </ul>
   </section>
 
   <section class="datos">
     <p class="nombre">{{ nombre_completo }}</p>
+    {% if u.nota_estado %}
+      <div style="background: rgba(0,0,0,0.05); padding: 0.4rem 0.8rem; border-radius: 15px; display: inline-block; margin: 0.4rem 0;">
+        💭 <span>{{ u.nota_estado }}</span>
+      </div>
+    {% endif %}
+
+    {% if es_mio %}
+      <form action="{{ url_for('actualizar_nota') }}" method="post" style="display: flex; gap: 0.4rem; margin-top: 0.5rem;">
+        <input type="text" name="nota_estado" maxlength="100" placeholder="¿Cómo te sientes? Ej: ¡Listo para la feria! 🚀" value="{{ u.nota_estado or '' }}" class="input-comentario" style="font-size:0.85rem;">
+        <button type="submit" class="boton-sec btn-sm">Guardar Nota</button>
+      </form>
+    {% endif %}
+
     {% if u.pronombres %}<p class="detalle">Pronombres: {{ u.pronombres }}</p>{% endif %}
     {% if sexo %}<p class="detalle">Sexo: {{ sexo }}</p>{% endif %}
     {% if enlaces %}
@@ -36,13 +49,32 @@
     {% endif %}
   </section>
 
-  <div class="acciones">
-    {% if es_mio %}<a class="boton" href="{{ url_for('editar_perfil') }}">Editar perfil</a>{% endif %}
-    <button class="boton-sec" type="button" id="abrir-qr">Compartir perfil</button>
+  <!-- Botones de Acción principales -->
+  <div class="acciones" style="display: flex; gap: 0.5rem; justify-content: center; align-items: center; margin: 1rem 0;">
+    {% if es_mio %}
+      <a class="boton" href="{{ url_for('editar_perfil') }}">Editar perfil</a>
+      <button class="boton-sec" type="button" id="abrir-qr">Compartir perfil</button>
+    {% else %}
+      <!-- Botón de Seguir -->
+      <button class="boton" type="button" id="btn-seguir" data-id="{{ u.id }}">
+        {{ 'Siguiendo' if lo_sigo else 'Seguir' }}
+      </button>
+
+      <!-- Botón único para Compartir -->
+      <button class="boton-sec" type="button" id="abrir-qr">Compartir perfil</button>
+
+      <!-- Acciones de Silenciar y Bloquear -->
+      <form action="{{ url_for('accion_perfil', perfil_id=u.id, tipo='silencio') }}" method="post" style="display:inline;">
+        <button class="boton-sec btn-sm" type="submit">Silenciar</button>
+      </form>
+      <form action="{{ url_for('accion_perfil', perfil_id=u.id, tipo='bloqueo') }}" method="post" style="display:inline;" onsubmit="return confirm('¿Deseas bloquear a este perfil?');">
+        <button class="boton-sec btn-sm btn-borrar" type="submit">Bloquear</button>
+      </form>
+    {% endif %}
   </div>
 
   {% if es_mio %}
-    <div style="text-align: center; margin: 20px 0;">
+    <div style="text-align: center; margin: 15px 0;">
       <a href="{{ url_for('publicar') }}" class="boton">+ Crear nuevo Stand</a>
     </div>
   {% endif %}
@@ -51,13 +83,21 @@
   <section class="galeria-stands">
     {% for pub in publicaciones %}
       <div class="stand-item item-perfil-media" 
-        ...
-        data-url="{{ pub.archivo_multimedia }}" ...>
-      {% if pub.es_video %}
-        <video src="{{ pub.archivo_multimedia }}" muted loop playsinline></video>
-      {% else %}
-        <img src="{{ pub.archivo_multimedia }}" alt="Stand de @{{ u.username }}">
-      {% endif %}
+           style="cursor: pointer;"
+           data-id="{{ pub.id }}"
+           data-url="{{ pub.archivo_multimedia }}"
+           data-video="{{ pub.es_video }}"
+           data-desc="{{ pub.descripcion or '' }}"
+           data-autor="@{{ u.username }}"
+           data-likes="{{ pub.total_likes or 0 }}"
+           data-liked="{{ pub.dio_like or false }}"
+           data-saved="{{ pub.esta_guardado or false }}"
+           data-comentarios='{{ pub.comentarios_json|safe }}'>
+        {% if pub.es_video %}
+          <video src="{{ pub.archivo_multimedia }}" muted loop playsinline></video>
+        {% else %}
+          <img src="{{ pub.archivo_multimedia }}" alt="Stand de @{{ u.username }}">
+        {% endif %}
       </div>
     {% else %}
       <div class="vacio" style="grid-column: 1 / -1;">
@@ -82,7 +122,7 @@
     </div>
   </dialog>
 
-  <!-- Ventana Flotante Centrada -->
+  <!-- Ventana Flotante Modal del Stand -->
   <dialog id="modal-ver-media" class="modal-media-dialog">
     <div class="contenedor-modal-media">
       <button type="button" class="cerrar-modal" id="btn-cerrar-media-perfil">&times;</button>
@@ -104,10 +144,10 @@
         
         <p id="desc-modal" class="post-desc" style="margin-top: 0.5rem;"></p>
 
-        <!-- Lista de Comentarios en el Modal del Perfil -->
+        <!-- Lista de Comentarios en el Modal -->
         <div id="modal-lista-comentarios" class="lista-comentarios" style="margin-top: 0.8rem;"></div>
 
-        <!-- Formulario para Comentar desde el Modal del Perfil -->
+        <!-- Formulario para Comentar -->
         <form id="modal-form-comentario" method="post" class="form-comentario" style="margin-top: 0.8rem;">
           <input type="text" name="texto" placeholder="Añade un comentario..." required class="input-comentario">
           <button type="submit" class="boton btn-comentar">Publicar</button>
@@ -115,43 +155,6 @@
       </div>
     </div>
   </dialog>
-
-
-  <!-- En la sección de datos del perfil -->
-<section class="datos">
-  <p class="nombre">{{ nombre_completo }}</p>
-  
-  <!-- Muestra la Nota/Estado si existe -->
-  {% if u.nota_estado %}
-    <div style="background: rgba(255,255,255,0.1); padding: 0.4rem 0.8rem; border-radius: 15px; display: inline-block; margin: 0.4rem 0;">
-      💭 <span>{{ u.nota_estado }}</span>
-    </div>
-  {% endif %}
-
-  <!-- Si es mi perfil, formulario rápido para cambiar la Nota de Estado -->
-  {% if es_mio %}
-    <form action="{{ url_for('actualizar_nota') }}" method="post" style="display: flex; gap: 0.4rem; margin-top: 0.5rem;">
-      <input type="text" name="nota_estado" maxlength="100" placeholder="¿Cómo te sientes? Ejemplo: ¡Listo para la feria! 🚀😊" value="{{ u.nota_estado or '' }}" class="input-comentario" style="font-size:0.85rem;">
-      <button type="submit" class="boton-sec btn-sm">Guardar Nota</button>
-    </form>
-  {% endif %}
-</section>
-
-<!-- En las acciones del perfil -->
-<div class="acciones">
-  {% if es_mio %}
-    <a class="boton" href="{{ url_for('editar_perfil') }}">Editar perfil</a>
-  {% else %}
-    <!-- Opciones para Bloquear / Silenciar -->
-    <form action="{{ url_for('accion_perfil', perfil_id=u.id, tipo='silencio') }}" method="post" style="display:inline;">
-      <button class="boton-sec btn-sm" type="submit">Silenciar</button>
-    </form>
-    <form action="{{ url_for('accion_perfil', perfil_id=u.id, tipo='bloqueo') }}" method="post" style="display:inline;" onsubmit="return confirm('¿Deseas bloquear a este perfil?');">
-      <button class="boton-sec btn-sm btn-borrar" type="submit">Bloquear</button>
-    </form>
-  {% endif %}
-  <button class="boton-sec" type="button" id="abrir-qr">Compartir perfil</button>
-</div>
 {% endblock %}
 
 {% block scripts %}
@@ -176,7 +179,21 @@
       });
     }
 
-    // Modal de Multimedia en Perfil
+    // Funcionalidad de Seguir
+    const btnSeguir = document.getElementById('btn-seguir');
+    if (btnSeguir) {
+      btnSeguir.addEventListener('click', async () => {
+        const perfilId = btnSeguir.getAttribute('data-id');
+        const res = await fetch('/seguir/' + perfilId, { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          btnSeguir.textContent = data.siguiendo ? 'Siguiendo' : 'Seguir';
+          document.getElementById('contador-seguidores').textContent = data.total_seguidores;
+        }
+      });
+    }
+
+    // Modal de Multimedia y Comentarios en Perfil
     const modalMedia = document.getElementById('modal-ver-media');
     const mediaTarget = document.getElementById('media-target');
     const descModal = document.getElementById('desc-modal');
@@ -189,7 +206,6 @@
     const modalLikesCount = document.getElementById('modal-likes-count');
     const modalBtnSave = document.getElementById('modal-btn-save');
     const modalBookmark = document.getElementById('modal-bookmark');
-    const modalBtnShare = document.getElementById('modal-btn-share');
 
     let currentPubId = null;
 
@@ -205,7 +221,7 @@
         let liked = item.getAttribute('data-liked') === 'true' || item.getAttribute('data-liked') === 'True';
         let saved = item.getAttribute('data-saved') === 'true' || item.getAttribute('data-saved') === 'True';
 
-        // Cargar comentarios
+        // Cargar comentarios garantizados
         let comentarios = [];
         try {
           comentarios = JSON.parse(item.getAttribute('data-comentarios') || '[]');
@@ -225,14 +241,13 @@
         modalLikesCount.textContent = likes;
         modalBookmark.textContent = saved ? '🔖' : '📑';
 
-        // Renderizar lista de comentarios
-        if (comentarios.length > 0) {
+        // Renderizar comentarios en la vista flotante
+        if (comentarios && comentarios.length > 0) {
           modalListaComentarios.innerHTML = comentarios.map(c => `<p class="item-comentario"><strong>@${c.username}</strong> ${c.texto}</p>`).join('');
         } else {
           modalListaComentarios.innerHTML = '<p class="ayuda" style="font-size:0.85rem; padding: 0.4rem 0;">Aún no hay comentarios en este Stand.</p>';
         }
 
-        // Asignar ruta al formulario de comentario
         if (modalFormComentario) {
           modalFormComentario.action = '/comentar/' + currentPubId;
         }
@@ -264,15 +279,6 @@
       });
     }
 
-    if (modalBtnShare) {
-      modalBtnShare.addEventListener('click', () => {
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(window.location.href);
-          alert('¡Enlace del perfil copiado al portapapeles!');
-        }
-      });
-    }
-
     function cerrarMedia() {
       if (mediaTarget) mediaTarget.innerHTML = '';
       if (modalMedia) modalMedia.close();
@@ -286,5 +292,4 @@
     }
   });
 </script>
-
 {% endblock %}

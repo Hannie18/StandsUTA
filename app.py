@@ -181,7 +181,7 @@ def inicio():
     user_id = session["user_id"]
     db = get_db()
     with db.cursor() as cur:
-        # 1. Feed excluyendo bloqueados/silenciados
+        # 1. Obtener publicaciones excluyendo usuarios bloqueados/silenciados
         cur.execute("""
             SELECT p.*, u.username, u.foto AS usuario_foto,
               (SELECT COUNT(*) FROM me_gusta WHERE publicacion_id = p.id) AS total_likes,
@@ -206,7 +206,7 @@ def inicio():
             """, (p["id"],))
             p["comentarios"] = cur.fetchall()
 
-        # 2. Recomendaciones: Todos los demás perfiles excepto el usuario en sesión y los bloqueados
+        # 2. Obtener los otros perfiles como recomendaciones
         cur.execute("""
             SELECT id, username, nombre, apellido, foto, nota_estado 
             FROM usuarios 
@@ -351,17 +351,6 @@ def mostrar_perfil(u):
     )
 
 # ---------- Perfil Propio ----------
-@app.route("/perfil")
-@login_requerido
-def perfil():
-    u = obtener_usuario("id", session["user_id"])
-    if not u:
-        session.clear()
-        return redirect(url_for("login"))
-    return redirect(url_for("perfil_publico", username=u["username"]))
-
-
-# ---------- Perfil Público (Ver otros usuarios o mi propio perfil por username) ----------
 @app.route("/perfil/<username>")
 @app.route("/u/<username>")
 @login_requerido
@@ -369,10 +358,10 @@ def perfil_publico(username):
     user_actual_id = session["user_id"]
     db = get_db()
     with db.cursor() as cur:
-        # Buscar al usuario del perfil que estamos visitando
+        # 1. Obtener usuario objetivo
         cur.execute("SELECT * FROM usuarios WHERE username = %s", (username,))
         u = cur.fetchone()
-        
+
         if not u:
             db.close()
             flash("Usuario no encontrado.", "error")
@@ -383,7 +372,18 @@ def perfil_publico(username):
         enlaces = [{"url": url, "texto": urlparse(url).netloc.removeprefix("www.")}
                    for url in json.loads(u["enlaces"] or "[]")]
 
-        # Cargar las publicaciones de ESE usuario con las métricas del usuario en sesión
+        # 2. Contadores de Seguidores y Seguidos
+        cur.execute("SELECT COUNT(*) AS total FROM seguidores WHERE seguido_id = %s", (u["id"],))
+        total_seguidores = cur.fetchone()["total"]
+
+        cur.execute("SELECT COUNT(*) AS total FROM seguidores WHERE seguidor_id = %s", (u["id"],))
+        total_seguidos = cur.fetchone()["total"]
+
+        # 3. Verificar si el usuario actual ya sigue a este perfil
+        cur.execute("SELECT 1 FROM seguidores WHERE seguidor_id = %s AND seguido_id = %s", (user_actual_id, u["id"]))
+        lo_sigo = bool(cur.fetchone())
+
+        # 4. Cargar publicaciones con comentarios corregidos
         cur.execute("""
             SELECT p.*,
               (SELECT COUNT(*) FROM me_gusta WHERE publicacion_id = p.id) AS total_likes,
@@ -395,7 +395,6 @@ def perfil_publico(username):
         """, (user_actual_id, user_actual_id, u["id"]))
         publicaciones = cur.fetchall()
 
-        # Formatear comentarios en JSON
         for p in publicaciones:
             cur.execute("""
                 SELECT c.texto, u.username 
@@ -405,6 +404,7 @@ def perfil_publico(username):
                 ORDER BY c.creado_en ASC
             """, (p["id"],))
             coms = cur.fetchall()
+            # Aseguramos formato JSON limpio para los comentarios
             p["comentarios_json"] = json.dumps(coms)
 
     db.close()
@@ -412,6 +412,7 @@ def perfil_publico(username):
         "perfil.html", u=u, publicaciones=publicaciones, es_mio=es_mio,
         nombre_completo=nombre, enlaces=enlaces, sexo=SEXOS.get(u["sexo"]),
         seccion="perfil" if es_mio else "",
+        total_seguidores=total_seguidores, total_seguidos=total_seguidos, lo_sigo=lo_sigo,
         url_perfil=url_for("perfil_publico", username=u["username"], _external=True)
     )
 
@@ -656,3 +657,32 @@ def actualizar_nota():
     db.close()
     flash("Nota de estado actualizada.", "ok")
     return redirect(url_for("perfil"))
+
+
+#------------ SEGUIR -----------------
+@app.route("/seguir/<int:perfil_id>", methods=["POST"])
+@login_requerido
+def seguir_usuario(perfil_id):
+    user_id = session["user_id"]
+    if perfil_id == user_id:
+        return {"status": "error", "mensaje": "No te puedes seguir a ti mismo"}
+
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT * FROM seguidores WHERE seguidor_id=%s AND seguido_id=%s", (user_id, perfil_id))
+        existe = cur.fetchone()
+
+        if existe:
+            cur.execute("DELETE FROM seguidores WHERE seguidor_id=%s AND seguido_id=%s", (user_id, perfil_id))
+            siguiendo = False
+        else:
+            cur.execute("INSERT INTO seguidores (seguidor_id, seguido_id) VALUES (%s, %s)", (user_id, perfil_id))
+            siguiendo = True
+        db.commit()
+
+        # Obtener los nuevos contadores
+        cur.execute("SELECT COUNT(*) AS total FROM seguidores WHERE seguido_id=%s", (perfil_id,))
+        total_seguidores = cur.fetchone()["total"]
+
+    db.close()
+    return {"status": "ok", "siguiendo": siguiendo, "total_seguidores": total_seguidores}
