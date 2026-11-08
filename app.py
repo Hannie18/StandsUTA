@@ -323,8 +323,20 @@ def mostrar_perfil(u):
         publicaciones=publicaciones
     )
 
-# ---------- Perfil Público (Ver otros usuarios) ----------
+# ---------- Perfil Propio ----------
+@app.route("/perfil")
+@login_requerido
+def perfil():
+    u = obtener_usuario("id", session["user_id"])
+    if not u:
+        session.clear()
+        return redirect(url_for("login"))
+    return redirect(url_for("perfil_publico", username=u["username"]))
+
+
+# ---------- Perfil Público (Ver otros usuarios o mi propio perfil por username) ----------
 @app.route("/perfil/<username>")
+@app.route("/u/<username>")
 @login_requerido
 def perfil_publico(username):
     user_actual_id = session["user_id"]
@@ -340,6 +352,9 @@ def perfil_publico(username):
             return redirect(url_for("inicio"))
 
         es_mio = (u["id"] == user_actual_id)
+        nombre = " ".join(x for x in (u["nombre"], u["apellido"]) if x) or "Anónimo"
+        enlaces = [{"url": url, "texto": urlparse(url).netloc.removeprefix("www.")}
+                   for url in json.loads(u["enlaces"] or "[]")]
 
         # Cargar las publicaciones de ESE usuario con las métricas del usuario en sesión
         cur.execute("""
@@ -366,14 +381,12 @@ def perfil_publico(username):
             p["comentarios_json"] = json.dumps(coms)
 
     db.close()
-    return render_template("perfil.html", u=u, publicaciones=publicaciones, es_mio=es_mio)
-@app.route("/u/<username>")
-@login_requerido
-def perfil_publico(username):
-    u = obtener_usuario("username", username)
-    if not u:
-        abort(404)
-    return mostrar_perfil(u)
+    return render_template(
+        "perfil.html", u=u, publicaciones=publicaciones, es_mio=es_mio,
+        nombre_completo=nombre, enlaces=enlaces, sexo=SEXOS.get(u["sexo"]),
+        seccion="perfil" if es_mio else "",
+        url_perfil=url_for("perfil_publico", username=u["username"], _external=True)
+    )
 
 
 @app.route("/perfil/editar", methods=["GET", "POST"])
