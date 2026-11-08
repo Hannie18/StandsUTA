@@ -416,7 +416,16 @@ def perfil_publico(username):
         url_perfil=url_for("perfil_publico", username=u["username"], _external=True)
     )
 
+#-------------- PERFIL -----------------
+# 1. RUTA /perfil (Soluciona el error BuildError de Flask)
+@app.route("/perfil")
+@login_requerido
+def perfil():
+    # Redirige automáticamente al perfil público del usuario en sesión
+    return redirect(url_for("perfil_publico", username=session["username"]))
 
+
+# 2. RUTA /perfil/editar ACTUALIZADA CON CLOUDINARY
 @app.route("/perfil/editar", methods=["GET", "POST"])
 @login_requerido
 def editar_perfil():
@@ -461,17 +470,19 @@ def editar_perfil():
             else:
                 errores.append(f"El enlace {i} no es válido.")
 
-    nueva_foto = None
+    # Subida de la nueva foto a Cloudinary
+    nueva_foto_url = None
     archivo = request.files.get("foto")
     if archivo and archivo.filename:
         try:
-            img = Image.open(archivo.stream)
-            formato = img.format
-            img.verify()
-            archivo.stream.seek(0)
-            nueva_foto = f"{uuid4().hex}.{FORMATOS_FOTO[formato]}"
-        except Exception:
-            errores.append("La foto debe ser una imagen PNG, JPG o WEBP.")
+            # Subir directamente a Cloudinary
+            upload_result = cloudinary.uploader.upload(
+                archivo,
+                folder="stands_uta/perfiles"
+            )
+            nueva_foto_url = upload_result.get("secure_url")
+        except Exception as e:
+            errores.append("Error al subir la imagen a la nube. Inténtalo de nuevo.")
 
     if not errores:
         db = get_db()
@@ -481,17 +492,12 @@ def editar_perfil():
                     "UPDATE usuarios SET username=%s, nombre=%s, apellido=%s, pronombres=%s, "
                     "sexo=%s, enlaces=%s, foto=%s WHERE id=%s",
                     (username, nombre or None, apellido or None, pronombres or None, sexo or None,
-                     json.dumps(enlaces), nueva_foto or u["foto"], u["id"]))
+                     json.dumps(enlaces), nueva_foto_url or u["foto"], u["id"]))
             db.commit()
-            if nueva_foto:
-                archivo.save(os.path.join(CARPETA_FOTOS, nueva_foto))
-                if u["foto"]:
-                    try:
-                        os.remove(os.path.join(CARPETA_FOTOS, u["foto"]))
-                    except OSError:
-                        pass
+            
+            # Actualizar el username en sesión por si lo cambió
             session["username"] = username
-            flash("Cambios guardados.", "ok")
+            flash("Cambios guardados con éxito.", "ok")
             return redirect(url_for("perfil"))
         except pymysql.err.IntegrityError:
             errores.append("Ese nombre de usuario ya está en uso.")
