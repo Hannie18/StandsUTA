@@ -7,7 +7,8 @@
   <form method="post" enctype="multipart/form-data" class="formulario panel-form">
     <div class="fila-foto">
       {% if u.foto %}
-        <img id="vista-foto" class="avatar avatar-chico" src="{{ url_for('static', filename='uploads/' ~ u.foto) }}" alt="Tu foto de perfil actual">
+        <!-- CAMBIO AQUÍ: Se usa u.foto directamente en lugar de url_for('static') -->
+        <img id="vista-foto" class="avatar avatar-chico" src="{{ u.foto }}" alt="Tu foto de perfil actual">
       {% else %}
         <div id="vista-foto-vacia" class="avatar avatar-chico" role="img" aria-label="Sin foto de perfil">{{ icono_usuario() }}</div>
         <img id="vista-foto" class="avatar avatar-chico" src="" alt="Vista previa de tu nueva foto" hidden>
@@ -53,7 +54,7 @@
 
 {% block scripts %}
 <script>
-  // Vista previa de la foto elegida (solo visual)
+  // Vista previa de la foto elegida (solo visual antes de enviar)
   document.getElementById('foto').addEventListener('change', (e) => {
     const archivo = e.target.files[0];
     if (!archivo) return;

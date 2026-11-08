@@ -12,7 +12,7 @@
 
   <section class="cabecera">
     {% if u.foto %}
-      <img class="avatar" src="{{ url_for('static', filename='uploads/' ~ u.foto) }}" alt="Foto de perfil de @{{ u.username }}">
+      <img class="avatar" src="{{ u.foto }}" alt="Foto de perfil de @{{ u.username }}">
     {% else %}
       <div class="avatar" role="img" aria-label="Sin foto de perfil">{{ icono_usuario() }}</div>
     {% endif %}
@@ -51,21 +51,13 @@
   <section class="galeria-stands">
     {% for pub in publicaciones %}
       <div class="stand-item item-perfil-media" 
-           style="cursor: pointer;"
-           data-id="{{ pub.id }}"
-           data-url="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}"
-           data-video="{{ pub.es_video }}"
-           data-desc="{{ pub.descripcion or '' }}"
-           data-autor="@{{ u.username }}"
-           data-likes="{{ pub.total_likes or 0 }}"
-           data-liked="{{ pub.dio_like or false }}"
-           data-saved="{{ pub.esta_guardado or false }}"
-           data-comentarios='{{ pub.comentarios_json }}'>
-        {% if pub.es_video %}
-          <video src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" muted loop playsinline></video>
-        {% else %}
-          <img src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" alt="Stand de @{{ u.username }}">
-        {% endif %}
+        ...
+        data-url="{{ pub.archivo_multimedia }}" ...>
+      {% if pub.es_video %}
+        <video src="{{ pub.archivo_multimedia }}" muted loop playsinline></video>
+      {% else %}
+        <img src="{{ pub.archivo_multimedia }}" alt="Stand de @{{ u.username }}">
+      {% endif %}
       </div>
     {% else %}
       <div class="vacio" style="grid-column: 1 / -1;">

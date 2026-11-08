@@ -15,6 +15,20 @@ from flask import (Flask, abort, flash, redirect, render_template, request,
 from PIL import Image
 from werkzeug.security import check_password_hash, generate_password_hash
 
+import cloudinary
+import cloudinary.uploader
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Configurar Cloudinary
+cloudinary.config(
+    cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.getenv('CLOUDINARY_API_KEY'),
+    api_secret=os.getenv('CLOUDINARY_API_SECRET'),
+    secure=True
+)
+
 app = Flask(__name__)
 app.secret_key = "cambia-esta-clave-por-una-propia"
 app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024  # fotos y videos de hasta 15 MB
@@ -509,31 +523,45 @@ def publicar():
         musica = request.form.get("musica", "").strip()
         archivo = request.files.get("multimedia")
         
-        nombre_archivo = None
+        url_multimedia = None
         es_video = False
         errores = []
 
         if archivo and archivo.filename:
             ext = archivo.filename.rsplit('.', 1)[-1].lower()
-            if ext in ['png', 'jpg', 'jpeg', 'webp']:
-                nombre_archivo = f"{uuid4().hex}.{ext}"
-            elif ext in ['mp4', 'webm', 'mov']:
-                nombre_archivo = f"{uuid4().hex}.{ext}"
-                es_video = True
-            else:
-                errores.append("Formato no válido. Sube imágenes (JPG/PNG) o videos cortos (MP4).")
             
-            if not errores:
-                archivo.save(os.path.join(CARPETA_FOTOS, nombre_archivo))
+            try:
+                if ext in ['png', 'jpg', 'jpeg', 'webp']:
+                    # Subir imagen a Cloudinary
+                    upload_result = cloudinary.uploader.upload(
+                        archivo,
+                        folder="stands_uta/publicaciones"
+                    )
+                    url_multimedia = upload_result.get('secure_url')
+                    
+                elif ext in ['mp4', 'webm', 'mov']:
+                    # Subir video a Cloudinary
+                    upload_result = cloudinary.uploader.upload(
+                        archivo,
+                        resource_type="video",
+                        folder="stands_uta/publicaciones"
+                    )
+                    url_multimedia = upload_result.get('secure_url')
+                    es_video = True
+                else:
+                    errores.append("Formato no válido. Sube imágenes (JPG/PNG) o videos cortos (MP4).")
+            except Exception as e:
+                errores.append(f"Error al subir archivo a la nube: {str(e)}")
 
-        if not errores and (nombre_archivo or descripcion):
+        if not errores and (url_multimedia or descripcion):
             db = get_db()
             try:
                 with db.cursor() as cur:
+                    # Guardamos `url_multimedia` (la URL pública de Cloudinary) en la columna `archivo_multimedia`
                     cur.execute(
                         "INSERT INTO publicaciones (usuario_id, descripcion, ubicacion, musica, archivo_multimedia, es_video) "
                         "VALUES (%s, %s, %s, %s, %s, %s)",
-                        (session["user_id"], descripcion or None, ubicacion or None, musica or None, nombre_archivo, es_video)
+                        (session["user_id"], descripcion or None, ubicacion or None, musica or None, url_multimedia, es_video)
                     )
                 db.commit()
                 flash("Publicación subida con éxito.", "ok")

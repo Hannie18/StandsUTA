@@ -13,7 +13,7 @@
         <header class="post-cabecera">
           <a href="{{ url_for('perfil_publico', username=pub.username) }}" class="post-autor">
             {% if pub.usuario_foto %}
-              <img src="{{ url_for('static', filename='uploads/' ~ pub.usuario_foto) }}" alt="Foto de @{{ pub.username }}">
+              <img src="{{ pub.usuario_foto }}" alt="Foto de @{{ pub.username }}">
             {% else %}
               <div class="avatar-min">U</div>
             {% endif %}
@@ -33,15 +33,12 @@
         <!-- Contenido Multimedia -->
         {% if pub.archivo_multimedia %}
           <div class="post-media btn-ver-media" 
-               style="cursor: pointer;"
-               data-url="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}"
-               data-video="{{ pub.es_video }}"
-               data-desc="{{ pub.descripcion or '' }}"
-               data-autor="@{{ pub.username }}">
+                ...
+                data-url="{{ pub.archivo_multimedia }}" ...>
             {% if pub.es_video %}
-              <video src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" controls></video>
-            {% else %}
-              <img src="{{ url_for('static', filename='uploads/' ~ pub.archivo_multimedia) }}" alt="Stand de @{{ pub.username }}">
+              <video src="{{ pub.archivo_multimedia }}" controls></video>
+             {% else %}
+              <img src="{{ pub.archivo_multimedia }}" alt="Stand de @{{ pub.username }}">
             {% endif %}
           </div>
         {% endif %}
