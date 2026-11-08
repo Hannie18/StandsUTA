@@ -323,7 +323,6 @@ def mostrar_perfil(u):
         publicaciones=publicaciones
     )
 
-# ---------- Ruta Perfil en app.py ----------
 # ---------- Perfil Público (Ver otros usuarios) ----------
 @app.route("/perfil/<username>")
 @login_requerido
