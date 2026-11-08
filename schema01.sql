@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   apellido VARCHAR(40) NULL,
   pronombres VARCHAR(30) NULL,
   sexo VARCHAR(10) NULL,
-  foto VARCHAR(60) NULL,
+  foto VARCHAR(500) NULL,
   enlaces TEXT NULL,
   creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

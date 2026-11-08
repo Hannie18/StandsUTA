@@ -5,5 +5,5 @@ ALTER TABLE usuarios
   ADD apellido VARCHAR(40) NULL,
   ADD pronombres VARCHAR(30) NULL,
   ADD sexo VARCHAR(10) NULL,
-  ADD foto VARCHAR(60) NULL,
+  ADD foto VARCHAR(500) NULL,
   ADD enlaces TEXT NULL;

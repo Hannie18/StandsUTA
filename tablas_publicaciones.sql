@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS publicaciones (
   descripcion TEXT NULL,
   ubicacion VARCHAR(100) NULL,
   musica VARCHAR(100) NULL,
-  archivo_multimedia VARCHAR(60) NULL,
+  archivo_multimedia VARCHAR(500) NULL,
   es_video BOOLEAN DEFAULT FALSE,
   creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
