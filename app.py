@@ -181,7 +181,7 @@ def inicio():
     user_id = session["user_id"]
     db = get_db()
     with db.cursor() as cur:
-        # Extraemos TODAS las publicaciones de TODOS los usuarios
+        # 1. Feed excluyendo bloqueados/silenciados
         cur.execute("""
             SELECT p.*, u.username, u.foto AS usuario_foto,
               (SELECT COUNT(*) FROM me_gusta WHERE publicacion_id = p.id) AS total_likes,
@@ -189,11 +189,13 @@ def inicio():
               (SELECT COUNT(*) FROM guardados WHERE publicacion_id = p.id AND usuario_id = %s) AS esta_guardado
             FROM publicaciones p
             JOIN usuarios u ON p.usuario_id = u.id
+            WHERE p.usuario_id NOT IN (
+                SELECT perfil_id FROM bloqueos_silencios WHERE usuario_id = %s
+            )
             ORDER BY p.creado_en DESC
-        """, (user_id, user_id))
+        """, (user_id, user_id, user_id))
         publicaciones = cur.fetchall()
 
-        # Cargar comentarios para cada publicación en el Feed
         for p in publicaciones:
             cur.execute("""
                 SELECT c.texto, c.creado_en, u.username 
@@ -203,9 +205,20 @@ def inicio():
                 ORDER BY c.creado_en ASC
             """, (p["id"],))
             p["comentarios"] = cur.fetchall()
-            
+
+        # 2. Recomendaciones: Todos los demás perfiles excepto el usuario en sesión y los bloqueados
+        cur.execute("""
+            SELECT id, username, nombre, apellido, foto, nota_estado 
+            FROM usuarios 
+            WHERE id != %s AND id NOT IN (
+                SELECT perfil_id FROM bloqueos_silencios WHERE usuario_id = %s AND tipo = 'bloqueo'
+            )
+            LIMIT 3
+        """, (user_id, user_id))
+        recomendados = cur.fetchall()
+
     db.close()
-    return render_template("para_ti.html", publicaciones=publicaciones, seccion="inicio")
+    return render_template("para_ti.html", publicaciones=publicaciones, recomendados=recomendados, seccion="inicio")
 # ---------- Borrar Publicación ----------
 @app.route("/borrar_publicacion/<int:pub_id>", methods=["POST"])
 @login_requerido
@@ -577,3 +590,69 @@ def publicar():
             flash(e, "error")
 
     return render_template("publicar.html", seccion="publicar")
+
+# ------- BUSCADOR DE PERFIL -------------------
+
+@app.route("/buscar", methods=["GET"])
+@login_requerido
+def buscar_perfiles():
+    query = request.args.get("q", "").strip()
+    resultados = []
+    if query:
+        db = get_db()
+        with db.cursor() as cur:
+            # Buscar por username, nombre o apellido evitando el usuario actual
+            cur.execute("""
+                SELECT id, username, nombre, apellido, foto, nota_estado 
+                FROM usuarios 
+                WHERE (username LIKE %s OR nombre LIKE %s OR apellido LIKE %s)
+                  AND id != %s
+                LIMIT 10
+            """, (f"%{query}%", f"%{query}%", f"%{query}%", session["user_id"]))
+            resultados = cur.fetchall()
+        db.close()
+    return render_template("buscar.html", query=query, resultados=resultados, seccion="buscar")
+
+# -------------- BLOQUEAR O SILENCIAR -------------------
+@app.route("/accion_perfil/<int:perfil_id>/<tipo>", methods=["POST"])
+@login_requerido
+def accion_perfil(perfil_id, tipo):
+    if tipo not in ["bloqueo", "silencio"]:
+        abort(400)
+    
+    user_id = session["user_id"]
+    if perfil_id == user_id:
+        flash("No puedes realizar esta acción sobre tu propio perfil.", "error")
+        return redirect(request.referrer or url_for("inicio"))
+
+    db = get_db()
+    with db.cursor() as cur:
+        # Alternar la acción (si ya existe, la quita; si no, la agrega)
+        cur.execute("SELECT * FROM bloqueos_silencios WHERE usuario_id=%s AND perfil_id=%s AND tipo=%s", 
+                    (user_id, perfil_id, tipo))
+        existe = cur.fetchone()
+        
+        if existe:
+            cur.execute("DELETE FROM bloqueos_silencios WHERE usuario_id=%s AND perfil_id=%s AND tipo=%s", 
+                        (user_id, perfil_id, tipo))
+            flash(f"Se ha quitado el {tipo}.", "ok")
+        else:
+            cur.execute("INSERT INTO bloqueos_silencios (usuario_id, perfil_id, tipo) VALUES (%s, %s, %s)", 
+                        (user_id, perfil_id, tipo))
+            flash(f"Perfil {tipo}ado con éxito.", "ok")
+        db.commit()
+    db.close()
+    return redirect(request.referrer or url_for("inicio"))
+
+# ------------- ACTUALIZAR NOTA DE ESTADO CON EMOJI ------------
+@app.route("/actualizar_nota", methods=["POST"])
+@login_requerido
+def actualizar_nota():
+    nota = request.form.get("nota_estado", "").strip()
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("UPDATE usuarios SET nota_estado=%s WHERE id=%s", (nota or None, session["user_id"]))
+        db.commit()
+    db.close()
+    flash("Nota de estado actualizada.", "ok")
+    return redirect(url_for("perfil"))

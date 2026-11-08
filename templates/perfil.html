@@ -115,6 +115,43 @@
       </div>
     </div>
   </dialog>
+
+
+  <!-- En la sección de datos del perfil -->
+<section class="datos">
+  <p class="nombre">{{ nombre_completo }}</p>
+  
+  <!-- Muestra la Nota/Estado si existe -->
+  {% if u.nota_estado %}
+    <div style="background: rgba(255,255,255,0.1); padding: 0.4rem 0.8rem; border-radius: 15px; display: inline-block; margin: 0.4rem 0;">
+      💭 <span>{{ u.nota_estado }}</span>
+    </div>
+  {% endif %}
+
+  <!-- Si es mi perfil, formulario rápido para cambiar la Nota de Estado -->
+  {% if es_mio %}
+    <form action="{{ url_for('actualizar_nota') }}" method="post" style="display: flex; gap: 0.4rem; margin-top: 0.5rem;">
+      <input type="text" name="nota_estado" maxlength="100" placeholder="¿Cómo te sientes? Ejemplo: ¡Listo para la feria! 🚀😊" value="{{ u.nota_estado or '' }}" class="input-comentario" style="font-size:0.85rem;">
+      <button type="submit" class="boton-sec btn-sm">Guardar Nota</button>
+    </form>
+  {% endif %}
+</section>
+
+<!-- En las acciones del perfil -->
+<div class="acciones">
+  {% if es_mio %}
+    <a class="boton" href="{{ url_for('editar_perfil') }}">Editar perfil</a>
+  {% else %}
+    <!-- Opciones para Bloquear / Silenciar -->
+    <form action="{{ url_for('accion_perfil', perfil_id=u.id, tipo='silencio') }}" method="post" style="display:inline;">
+      <button class="boton-sec btn-sm" type="submit">Silenciar</button>
+    </form>
+    <form action="{{ url_for('accion_perfil', perfil_id=u.id, tipo='bloqueo') }}" method="post" style="display:inline;" onsubmit="return confirm('¿Deseas bloquear a este perfil?');">
+      <button class="boton-sec btn-sm btn-borrar" type="submit">Bloquear</button>
+    </form>
+  {% endif %}
+  <button class="boton-sec" type="button" id="abrir-qr">Compartir perfil</button>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -249,4 +286,5 @@
     }
   });
 </script>
+
 {% endblock %}

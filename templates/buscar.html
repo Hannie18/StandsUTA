@@ -1,0 +1,38 @@
+{% extends "app_base.html" %}
+{% block titulo %}Buscar perfiles · StandsUTA{% endblock %}
+
+{% block contenido %}
+  <header class="barra-sup">
+    <h1>Buscar perfiles</h1>
+  </header>
+
+  <section class="panel-form" style="margin-bottom: 1.5rem;">
+    <form action="{{ url_for('buscar_perfiles') }}" method="get" style="display: flex; gap: 0.5rem;">
+      <input type="text" name="q" value="{{ query }}" placeholder="Buscar por @usuario o nombre..." required class="input-comentario" style="flex:1;">
+      <button type="submit" class="boton">Buscar</button>
+    </form>
+  </section>
+
+  <section class="lista-resultados">
+    {% for u in resultados %}
+      <div class="tarjeta-post" style="display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; margin-bottom: 0.5rem;">
+        <a href="{{ url_for('perfil_publico', username=u.username) }}" style="display: flex; align-items: center; gap: 0.8rem; text-decoration: none; color: inherit;">
+          {% if u.foto %}
+            <img src="{{ u.foto }}" class="avatar avatar-chico" style="width: 40px; height: 40px; border-radius: 50%;">
+          {% else %}
+            <div class="avatar-min">U</div>
+          {% endif %}
+          <div>
+            <strong>@{{ u.username }}</strong>
+            {% if u.nota_estado %}<span style="font-size: 0.85rem; margin-left: 0.5rem;">💭 {{ u.nota_estado }}</span>{% endif %}
+          </div>
+        </a>
+        <a href="{{ url_for('perfil_publico', username=u.username) }}" class="boton-sec btn-sm">Ver perfil</a>
+      </div>
+    {% else %}
+      {% if query %}
+        <p class="ayuda">No se encontraron perfiles para "{{ query }}".</p>
+      {% endif %}
+    {% endfor %}
+  </section>
+{% endblock %}

@@ -15,6 +15,10 @@
     <nav class="lateral" aria-label="Principal">
       <p class="logo">StandsUTA</p>
       <a class="nav-item" href="{{ url_for('inicio') }}" {% if seccion == 'inicio' %}aria-current="page"{% endif %}>{{ casa() }}<span>Para ti</span></a>
+      
+      <!-- NUEVA OPCIÓN DE BÚSQUEDA AGREGADA AQUÍ -->
+      <a class="nav-item" href="{{ url_for('buscar_perfiles') }}" {% if seccion == 'buscar' %}aria-current="page"{% endif %}>🔍 <span>Buscar</span></a>
+      
       <a class="nav-item" href="{{ url_for('perfil') }}" {% if seccion == 'perfil' %}aria-current="page"{% endif %}>{{ icono_usuario() }}<span>Perfil</span></a>
       <a class="nav-item salir" href="{{ url_for('salir') }}">{{ icono_salir() }}<span>Salir</span></a>
     </nav>

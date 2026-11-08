@@ -1,6 +1,29 @@
 {% extends "app_base.html" %}
 {% block titulo %}Para ti · StandsUTA{% endblock %}
 
+{% if recomendados %}
+  <div style="background: var(--panel-bg, #1e1e1e); padding: 1rem; border-radius: 10px; margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.8rem;">💡 Perfiles recomendados para ti</h3>
+    <div style="display: flex; gap: 1rem; overflow-x: auto;">
+      {% for rec in recomendados %}
+        <div style="text-align: center; min-width: 90px;">
+          <a href="{{ url_for('perfil_publico', username=rec.username) }}" style="text-decoration: none; color: inherit;">
+            {% if rec.foto %}
+              <img src="{{ rec.foto }}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+            {% else %}
+              <div class="avatar-min" style="margin: 0 auto; width: 50px; height: 50px; line-height: 50px;">U</div>
+            {% endif %}
+            <p style="font-size: 0.8rem; font-weight: bold; margin-top: 0.3rem;">@{{ rec.username }}</p>
+            {% if rec.nota_estado %}
+              <p style="font-size: 0.75rem; color: #888;">{{ rec.nota_estado }}</p>
+            {% endif %}
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
 {% block contenido %}
   <header class="barra-sup">
     <h1>Para ti</h1>
