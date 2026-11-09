@@ -21,6 +21,10 @@
       
       <a class="nav-item" href="{{ url_for('perfil') }}" {% if seccion == 'perfil' %}aria-current="page"{% endif %}>{{ icono_usuario() }}<span>Perfil</span></a>
       <a class="nav-item salir" href="{{ url_for('salir') }}">{{ icono_salir() }}<span>Salir</span></a>
+
+      <a class="nav-item" href="{{ url_for('mensajeria') }}" {% if seccion == 'mensajes' %}aria-current="page"{% endif %}>
+      💬 <span>Mensajes</span>
+      </a>
     </nav>
 
     <main class="contenido">

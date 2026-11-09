@@ -2,11 +2,7 @@
 {% block titulo %}Mensajes · StandsUTA{% endblock %}
 
 {% block contenido %}
-<!-- Calculamos el color del chat antes del HTML para no confundir al linter de VS Code -->
-{% set color_chat = '#ffffff' %}
-{% if chat_activo and chat_activo.color_fondo %}
-  {% set color_chat = chat_activo.color_fondo %}
-{% endif %}
+{% set color_actual = chat_activo.color_fondo if (chat_activo and chat_activo.color_fondo) else '#ffffff' %}
 
 <div class="contenedor-mensajeria">
   
@@ -39,17 +35,17 @@
     </div>
   </div>
 
-  <!-- PANEL DERECHO: CONVERSACIÓN Y PERSONALIZACIÓN DE FONDO -->
-    <div class="panel-chat-conversacion" id="panel-conversacion" data-color="{{ color_chat }}">
+  <!-- PANEL DERECHO: CONVERSACIÓN Y FONDO -->
+  <div class="panel-chat-conversacion" id="panel-chat" data-color="{{ color_actual }}">
     {% if chat_activo %}
       <!-- Cabecera del Chat -->
       <div class="topbar-chat-activo">
         <strong>Chat #{{ chat_activo.id }} {% if chat_activo.es_grupal %}({{ chat_activo.nombre }}){% endif %}</strong>
         
-        <!-- Formulario para Cambiar Color de Fondo -->
+        <!-- Cambiar y Guardar Color de Fondo -->
         <form action="{{ url_for('cambiar_fondo_chat', chat_id=chat_activo.id) }}" method="post" class="form-color-fondo">
           <label style="font-size: 0.75rem; color: #555;">🎨 Fondo:</label>
-          <input type="color" name="color_fondo" value="{{ chat_activo.color_fondo or '#ffffff' }}" onchange="this.form.submit()" class="input-picker-color">
+          <input type="color" name="color_fondo" value="{{ color_actual }}" onchange="this.form.submit()" class="input-picker-color">
         </form>
       </div>
 
@@ -67,7 +63,7 @@
         {% endfor %}
       </div>
 
-      <!-- Formulario para Enviar Mensaje -->
+      <!-- Formulario de Envío -->
       <form action="{{ url_for('enviar_mensaje', chat_id=chat_activo.id) }}" method="post" class="form-enviar-mensaje">
         <input type="text" name="contenido" placeholder="Escribe un mensaje..." required class="input-comentario" style="flex: 1;">
         <button type="submit" class="boton">Enviar</button>
@@ -81,7 +77,7 @@
 
 </div>
 
-<!-- MODAL: Crear Chat Grupal -->
+<!-- MODAL: Crear Grupo -->
 <dialog id="dlg-nuevo-grupo" class="modal-grupo-dialog">
   <form action="{{ url_for('crear_chat_grupal') }}" method="post">
     <h3 style="margin-top: 0;">👥 Crear Chat Grupal</h3>
@@ -105,6 +101,18 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const panel = document.getElementById('panel-chat');
+    if (panel) {
+      const color = panel.getAttribute('data-color');
+      if (color) {
+        panel.style.backgroundColor = color;
+      }
+    }
+  });
+</script>
+
 <style>
   .contenedor-mensajeria { display: flex; height: 85vh; border: 1px solid #ddd; border-radius: 12px; overflow: hidden; background: #fff; }
   .panel-chats-lista { width: 320px; border-right: 1px solid #eee; display: flex; flex-direction: column; }
@@ -118,7 +126,7 @@
   .titulo-chat-item { font-size: 0.9rem; display: block; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
   .ultimo-msg-chat { font-size: 0.75rem; color: #777; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; display: block; }
   
-  .panel-chat-conversacion { flex: 1; display: flex; flex-direction: column; }
+  .panel-chat-conversacion { flex: 1; display: flex; flex-direction: column; transition: background-color 0.2s ease; }
   .topbar-chat-activo { padding: 0.8rem 1rem; background: rgba(255,255,255,0.9); border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
   .form-color-fondo { display: flex; align-items: center; gap: 0.4rem; }
   .input-picker-color { border: none; cursor: pointer; width: 30px; height: 30px; background: none; }
