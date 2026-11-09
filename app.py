@@ -825,3 +825,145 @@ def verificar_bloqueo_tiempo():
                 desbloqueo = (datetime.now() + timedelta(hours=12)).isoformat()
                 session["bloqueado_hasta"] = desbloqueo
                 return redirect(request.url)
+
+
+#----------- MENSAJERIA -------------------
+# 1. Vista principal de Mensajes (Lista de chats y vista del chat activo)
+@app.route("/mensajes")
+@app.route("/mensajes/<int:chat_id>")
+@login_requerido
+def mensajeria(chat_id=None):
+    user_id = session["user_id"]
+    db = get_db()
+    with db.cursor() as cur:
+        # Obtener todos los chats donde participa el usuario
+        cur.execute("""
+            SELECT c.*, 
+              (SELECT contenido FROM mensajes WHERE chat_id = c.id ORDER BY creado_en DESC LIMIT 1) AS ultimo_mensaje
+            FROM chats c
+            JOIN chat_miembros cm ON c.id = cm.chat_id
+            WHERE cm.usuario_id = %s
+            ORDER BY c.creado_en DESC
+        """, (user_id,))
+        mis_chats = cur.fetchall()
+
+        # Para los chats individuales, obtener el nombre y foto de la otra persona
+        for chat in mis_chats:
+            if not chat["es_grupal"]:
+                cur.execute("""
+                    SELECT u.username, u.foto FROM usuarios u
+                    JOIN chat_miembros cm ON u.id = cm.usuario_id
+                    WHERE cm.chat_id = %s AND cm.usuario_id != %s
+                """, (chat["id"], user_id))
+                otro = cur.fetchone()
+                if otro:
+                    chat["titulo"] = f"@{otro['username']}"
+                    chat["foto"] = otro["foto"]
+            else:
+                chat["titulo"] = chat["nombre"] or "Chat Grupal"
+
+        # Cargar los datos del chat activo si se seleccionó uno
+        chat_activo = None
+        mensajes = []
+        if chat_id:
+            cur.execute("SELECT * FROM chats WHERE id = %s", (chat_id,))
+            chat_activo = cur.fetchone()
+            
+            if chat_activo:
+                cur.execute("""
+                    SELECT m.*, u.username, u.foto FROM mensajes m
+                    JOIN usuarios u ON m.remitente_id = u.id
+                    WHERE m.chat_id = %s
+                    ORDER BY m.creado_en ASC
+                """, (chat_id,))
+                mensajes = cur.fetchall()
+
+        # Obtener lista de usuarios para crear nuevos chats
+        cur.execute("SELECT id, username FROM usuarios WHERE id != %s", (user_id,))
+        todos_usuarios = cur.fetchall()
+
+    db.close()
+    return render_template(
+        "mensajes.html", 
+        mis_chats=mis_chats, 
+        chat_activo=chat_activo, 
+        mensajes=mensajes, 
+        todos_usuarios=todos_usuarios, 
+        seccion="mensajes"
+    )
+
+# 2. Iniciar chat individual directamente desde un perfil
+@app.route("/chat/iniciar/<int:otro_user_id>", methods=["POST"])
+@login_requerido
+def iniciar_chat_individual(otro_user_id):
+    user_id = session["user_id"]
+    db = get_db()
+    with db.cursor() as cur:
+        # Verificar si ya existe un chat individual entre los dos
+        cur.execute("""
+            SELECT c.id FROM chats c
+            JOIN chat_miembros cm1 ON c.id = cm1.chat_id
+            JOIN chat_miembros cm2 ON c.id = cm2.chat_id
+            WHERE c.es_grupal = FALSE AND cm1.usuario_id = %s AND cm2.usuario_id = %s
+        """, (user_id, otro_user_id))
+        existente = cur.fetchone()
+
+        if existente:
+            chat_id = existente["id"]
+        else:
+            # Crear nuevo chat individual
+            cur.execute("INSERT INTO chats (es_grupal) VALUES (FALSE)")
+            chat_id = cur.lastrowid
+            cur.execute("INSERT INTO chat_miembros (chat_id, usuario_id) VALUES (%s, %s), (%s, %s)", 
+                        (chat_id, user_id, chat_id, otro_user_id))
+            db.commit()
+
+    db.close()
+    return redirect(url_for("mensajeria", chat_id=chat_id))
+
+# 3. Crear Chat Grupal
+@app.route("/chat/crear_grupo", methods=["POST"])
+@login_requerido
+def crear_chat_grupal():
+    nombre_grupo = request.form.get("nombre_grupo", "").strip() or "Nuevo Grupo"
+    miembros_ids = request.form.getlist("miembros") # IDs seleccionados en checkboxes
+    user_id = session["user_id"]
+
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("INSERT INTO chats (nombre, es_grupal) VALUES (%s, TRUE)", (nombre_grupo,))
+        chat_id = cur.lastrowid
+        
+        # Insertar al creador y a los seleccionados
+        cur.execute("INSERT INTO chat_miembros (chat_id, usuario_id) VALUES (%s, %s)", (chat_id, user_id))
+        for m_id in miembros_ids:
+            cur.execute("INSERT IGNORE INTO chat_miembros (chat_id, usuario_id) VALUES (%s, %s)", (chat_id, m_id))
+        db.commit()
+    db.close()
+    return redirect(url_for("mensajeria", chat_id=chat_id))
+
+# 4. Enviar un mensaje
+@app.route("/chat/enviar/<int:chat_id>", methods=["POST"])
+@login_requerido
+def enviar_mensaje(chat_id):
+    texto = request.form.get("contenido", "").strip()
+    if texto:
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("INSERT INTO mensajes (chat_id, remitente_id, contenido) VALUES (%s, %s, %s)",
+                        (chat_id, session["user_id"], texto))
+            db.commit()
+        db.close()
+    return redirect(url_for("mensajeria", chat_id=chat_id))
+
+# 5. Modificar Color de Fondo del Chat
+@app.route("/chat/cambiar_fondo/<int:chat_id>", methods=["POST"])
+@login_requerido
+def cambiar_fondo_chat(chat_id):
+    color = request.form.get("color_fondo", "#f4f4f9")
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("UPDATE chats SET color_fondo=%s WHERE id=%s", (color, chat_id))
+        db.commit()
+    db.close()
+    return redirect(url_for("mensajeria", chat_id=chat_id))

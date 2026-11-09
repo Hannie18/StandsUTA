@@ -15,6 +15,11 @@
     {% if u.foto %}
       <img class="avatar" src="{{ u.foto }}" alt="Foto de perfil de @{{ u.username }}">
     {% else %}
+
+
+      <form action="{{ url_for('iniciar_chat_individual', otro_user_id=u.id) }}" method="post" style="display:inline;">
+         <button class="boton-sec" type="submit">Enviar mensaje</button>
+      </form>
       <div class="avatar" role="img" aria-label="Sin foto de perfil">{{ icono_usuario() }}</div>
     {% endif %}
     <ul class="cifras">
