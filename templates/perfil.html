@@ -16,10 +16,6 @@
       <img class="avatar" src="{{ u.foto }}" alt="Foto de perfil de @{{ u.username }}">
     {% else %}
 
-
-      <form action="{{ url_for('iniciar_chat_individual', otro_user_id=u.id) }}" method="post" style="display:inline;">
-         <button class="boton-sec" type="submit">Enviar mensaje</button>
-      </form>
       <div class="avatar" role="img" aria-label="Sin foto de perfil">{{ icono_usuario() }}</div>
     {% endif %}
     <ul class="cifras">
@@ -58,32 +54,33 @@
 
   <!-- ACCIONES PRINCIPALES -->
 <!-- ACCIONES PRINCIPALES Y MODERACIÓN -->
-  <div class="acciones" style="display: flex; flex-direction: column; align-items: center; gap: 0.8rem; margin: 1rem 0;">
+ <!-- ACCIONES PRINCIPALES Y MODERACIÓN -->
+  <div class="acciones" style="display: flex; flex-direction: column; align-items: center; gap: 0.8rem; margin: 1.5rem 0;">
     {% if es_mio %}
-      <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: center;">
+      <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: center; flex-wrap: wrap;">
         <a class="boton" href="{{ url_for('editar_perfil') }}">Editar perfil</a>
         <button class="boton-sec" type="button" id="abrir-qr">Compartir perfil</button>
       </div>
     {% else %}
-      <!-- Fila 1: Botones principales (Seguir, Enviar mensaje, Compartir) -->
+      <!-- Fila 1: Botones principales exactamente del mismo tamaño y estilo -->
       <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: center; flex-wrap: wrap;">
-        <button class="boton" type="button" id="btn-seguir" data-id="{{ u.id }}">
+        <button class="boton" type="button" id="btn-seguir" data-id="{{ u.id }}" style="padding: 0.6rem 1.2rem; display: inline-flex; align-items: center; justify-content: center; height: 42px; font-weight: 600;">
           {{ 'Siguiendo' if lo_sigo else 'Seguir' }}
         </button>
 
-        <form action="{{ url_for('iniciar_chat_individual', otro_user_id=u.id) }}" method="post" style="display:inline;">
-          <button class="boton-sec" type="submit">Enviar mensaje</button>
+        <form action="{{ url_for('iniciar_chat_individual', otro_user_id=u.id) }}" method="post" style="display:inline; margin: 0;">
+          <button class="boton-sec" type="submit" style="padding: 0.6rem 1.2rem; display: inline-flex; align-items: center; justify-content: center; height: 42px; font-weight: 600;">Enviar mensaje</button>
         </form>
 
-        <button class="boton-sec" type="button" id="abrir-qr">Compartir perfil</button>
+        <button class="boton-sec" type="button" id="abrir-qr" style="padding: 0.6rem 1.2rem; display: inline-flex; align-items: center; justify-content: center; height: 42px; font-weight: 600;">Compartir perfil</button>
       </div>
 
-      <!-- Fila 2: Botones secundarios de moderación abajo (Silenciar y Bloquear) -->
-      <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: center;">
-        <form action="{{ url_for('accion_perfil', perfil_id=u.id, tipo='silencio') }}" method="post" style="display:inline;">
+      <!-- Fila 2: Botones secundarios de moderación centrados abajo -->
+      <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: center; margin-top: 0.2rem;">
+        <form action="{{ url_for('accion_perfil', perfil_id=u.id, tipo='silencio') }}" method="post" style="display:inline; margin: 0;">
           <button class="boton-sec btn-sm" type="submit">Silenciar</button>
         </form>
-        <form action="{{ url_for('accion_perfil', perfil_id=u.id, tipo='bloqueo') }}" method="post" style="display:inline;" onsubmit="return confirm('¿Deseas bloquear a este perfil?');">
+        <form action="{{ url_for('accion_perfil', perfil_id=u.id, tipo='bloqueo') }}" method="post" style="display:inline; margin: 0;" onsubmit="return confirm('¿Deseas bloquear a este perfil?');">
           <button class="boton-sec btn-sm btn-borrar" type="submit">Bloquear</button>
         </form>
       </div>
