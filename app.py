@@ -230,6 +230,7 @@ def inicio():
         todas_historias = cur.fetchall()
 
         # Agrupar historias por usuario para la barra superior
+        # Agrupar historias por usuario para la barra superior
         historias_agrupadas = {}
         for h in todas_historias:
             uid = h["usuario_id"]
@@ -241,6 +242,10 @@ def inicio():
                     "items": []
                 }
             historias_agrupadas[uid]["items"].append(h)
+
+        lista_historias = list(historias_agrupadas.values())
+        for uh in lista_historias:
+            uh["items_json"] = json.dumps(uh["items"], default=str)
 
         # 3. Obtener los otros perfiles como recomendaciones
         cur.execute("""
@@ -258,7 +263,7 @@ def inicio():
         "para_ti.html",
         publicaciones=publicaciones,
         recomendados=recomendados,
-        usuarios_historias=list(historias_agrupadas.values()),
+        usuarios_historias=lista_historias,
         seccion="inicio"
     )
 # ---------- Borrar Publicación ----------
@@ -456,13 +461,13 @@ def perfil_publico(username):
 
         historias_activas = []
         if not me_bloqueo_historias:
-            cur.execute("""
-                SELECT id, archivo_multimedia, es_video, DATE_FORMAT(creado_en, '%%H:%%i') AS hora
-                FROM historias
-                WHERE usuario_id = %s AND expira_en > NOW()
-                ORDER BY creado_en ASC
-            """, (u["id"],))
-            historias_activas = cur.fetchall()
+         cur.execute("""
+             SELECT id, usuario_id, archivo_multimedia, es_video, DATE_FORMAT(creado_en, '%%H:%%i') AS hora
+             FROM historias
+             WHERE usuario_id = %s AND expira_en > NOW()
+             ORDER BY creado_en ASC
+         """, (u["id"],))
+         historias_activas = cur.fetchall()
 
         cur.execute("""
             SELECT id, titulo, archivo_multimedia, es_video
@@ -534,9 +539,12 @@ def perfil_publico(username):
         url_perfil=url_for("perfil_publico", username=u["username"], _external=True),
         cuentas_vinculadas=cuentas_vinculadas,
         publicaciones_guardadas=publicaciones_guardadas,
-        calendario_fotos=calendario_fotos
+        calendario_fotos=calendario_fotos,
+        historias_activas=historias_activas,
+        historias_json=json.dumps(historias_activas, default=str),
+        destacadas=destacadas,
+        restricciones_hist=restricciones_hist
     )
-
 #-------------- PERFIL -----------------
 # 1. RUTA /perfil (Soluciona el error BuildError de Flask)
 @app.route("/perfil")
@@ -755,9 +763,6 @@ def restringir_historia(objetivo_id, tipo):
     db.close()
     return redirect(request.referrer or url_for("inicio"))
 
-
-if __name__ == "__main__":
-    app.run(debug=True)
 
 # ---------- Publicaciones (Stands) ----------
 @app.route("/publicar", methods=["GET", "POST"])
@@ -1143,3 +1148,7 @@ def cambiar_fondo_chat(chat_id):
         db.commit()
     db.close()
     return redirect(url_for("mensajeria", chat_id=chat_id))
+
+
+if __name__ == "__main__":
+    app.run(debug=True)

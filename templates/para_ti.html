@@ -19,7 +19,7 @@
     {% for uh in usuarios_historias %}
       <button type="button" class="item-historia btn-abrir-historia"
               data-username="@{{ uh.username }}"
-              data-items='{{ uh.items | tojson | safe }}'>
+              data-items='{{ uh.items_json | safe }}'>
         <div class="aro-historia">
           {% if uh.foto %}
             <img src="{{ uh.foto }}" alt="@{{ uh.username }}" class="avatar-historia">
@@ -79,8 +79,10 @@
         <!-- Contenido Multimedia -->
         {% if pub.archivo_multimedia %}
           <div class="post-media btn-ver-media" 
-                ...
-                data-url="{{ pub.archivo_multimedia }}" ...>
+             data-url="{{ pub.archivo_multimedia }}"
+             data-video="{{ pub.es_video }}"
+             data-desc="{{ pub.descripcion or '' }}"
+             data-autor="@{{ pub.username }}">
             {% if pub.es_video %}
               <video src="{{ pub.archivo_multimedia }}" controls></video>
              {% else %}
@@ -147,8 +149,7 @@
       <p id="desc-modal" class="desc-modal"></p>
     </div>
   </dialog>
-{% endblock %}
-<!-- MODAL: SUBIR HISTORIA -->
+  <!-- MODAL: SUBIR HISTORIA -->
   <dialog id="dlg-subir-historia" class="modal-media-dialog">
     <form action="{{ url_for('subir_historia') }}" method="post" enctype="multipart/form-data" class="formulario">
       <h2 style="margin-top:0;">📸 Nueva Historia (24h)</h2>
@@ -193,6 +194,8 @@
       </form>
     </div>
   </dialog>
+{% endblock %}
+
 {% block scripts %}
 <script>
   document.addEventListener('DOMContentLoaded', () => {
@@ -281,7 +284,7 @@
     }
   });
 
-  const visorHist = document.getElementById('dlg-visor-historia');
+  const visorHist = document.getElementById('dlg-visor-historia')
   const visorMedia = document.getElementById('visor-media');
   const visorAutor = document.getElementById('visor-autor');
   const visorHora = document.getElementById('visor-hora');
