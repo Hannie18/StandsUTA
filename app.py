@@ -208,7 +208,41 @@ def inicio():
             """, (p["id"],))
             p["comentarios"] = cur.fetchall()
 
-        # 2. Obtener los otros perfiles como recomendaciones
+        # 2. Obtener historias activas (últimas 24h) agrupadas por usuario
+        cur.execute("""
+            SELECT h.id, h.usuario_id, h.archivo_multimedia, h.es_video,
+                   DATE_FORMAT(h.creado_en, '%%H:%%i') AS hora,
+                   u.username, u.foto AS usuario_foto
+            FROM historias h
+            JOIN usuarios u ON h.usuario_id = u.id
+            WHERE h.expira_en > NOW()
+              AND h.usuario_id NOT IN (
+                  SELECT objetivo_id FROM restricciones_historias WHERE usuario_id = %s
+              )
+              AND h.usuario_id NOT IN (
+                  SELECT usuario_id FROM restricciones_historias WHERE objetivo_id = %s AND tipo = 'bloqueo'
+              )
+              AND h.usuario_id NOT IN (
+                  SELECT perfil_id FROM bloqueos_silencios WHERE usuario_id = %s AND tipo = 'bloqueo'
+              )
+            ORDER BY (h.usuario_id = %s) DESC, h.creado_en ASC
+        """, (user_id, user_id, user_id, user_id))
+        todas_historias = cur.fetchall()
+
+        # Agrupar historias por usuario para la barra superior
+        historias_agrupadas = {}
+        for h in todas_historias:
+            uid = h["usuario_id"]
+            if uid not in historias_agrupadas:
+                historias_agrupadas[uid] = {
+                    "usuario_id": uid,
+                    "username": h["username"],
+                    "foto": h["usuario_foto"],
+                    "items": []
+                }
+            historias_agrupadas[uid]["items"].append(h)
+
+        # 3. Obtener los otros perfiles como recomendaciones
         cur.execute("""
             SELECT id, username, nombre, apellido, foto, nota_estado 
             FROM usuarios 
@@ -220,7 +254,13 @@ def inicio():
         recomendados = cur.fetchall()
 
     db.close()
-    return render_template("para_ti.html", publicaciones=publicaciones, recomendados=recomendados, seccion="inicio")
+    return render_template(
+        "para_ti.html",
+        publicaciones=publicaciones,
+        recomendados=recomendados,
+        usuarios_historias=list(historias_agrupadas.values()),
+        seccion="inicio"
+    )
 # ---------- Borrar Publicación ----------
 @app.route("/borrar_publicacion/<int:pub_id>", methods=["POST"])
 @login_requerido
@@ -407,6 +447,37 @@ def perfil_publico(username):
             ORDER BY p.creado_en DESC
         """, (user_actual_id, user_actual_id, u["id"]))
         publicaciones = cur.fetchall()
+        # 6. Historias activas (24h) y Destacadas del perfil
+        cur.execute("""
+            SELECT 1 FROM restricciones_historias 
+            WHERE usuario_id = %s AND objetivo_id = %s AND tipo = 'bloqueo'
+        """, (u["id"], user_actual_id))
+        me_bloqueo_historias = bool(cur.fetchone())
+
+        historias_activas = []
+        if not me_bloqueo_historias:
+            cur.execute("""
+                SELECT id, archivo_multimedia, es_video, DATE_FORMAT(creado_en, '%%H:%%i') AS hora
+                FROM historias
+                WHERE usuario_id = %s AND expira_en > NOW()
+                ORDER BY creado_en ASC
+            """, (u["id"],))
+            historias_activas = cur.fetchall()
+
+        cur.execute("""
+            SELECT id, titulo, archivo_multimedia, es_video
+            FROM historias_destacadas
+            WHERE usuario_id = %s
+            ORDER BY creado_en DESC
+        """, (u["id"],))
+        destacadas = cur.fetchall()
+
+        # Verificar si tengo silenciadas o bloqueadas sus historias
+        cur.execute("""
+            SELECT tipo FROM restricciones_historias
+            WHERE usuario_id = %s AND objetivo_id = %s
+        """, (user_actual_id, u["id"]))
+        restricciones_hist = [r["tipo"] for r in cur.fetchall()]
 
         for p in publicaciones:
             cur.execute("""
@@ -578,6 +649,111 @@ def codigo_qr(username):
 def foto_muy_pesada(e):
     flash("La foto pesa más de 3 MB. Elige una más ligera.", "error")
     return redirect(url_for("editar_perfil"))
+
+# ---------- HISTORIAS (24H), DESTACADOS Y RESTRICCIONES ----------
+@app.route("/historia/subir", methods=["POST"])
+@login_requerido
+def subir_historia():
+    archivo = request.files.get("multimedia")
+    destacar = request.form.get("destacar") == "1"
+    titulo_destacada = request.form.get("titulo_destacada", "").strip() or "Destacada"
+
+    if not archivo or not archivo.filename:
+        flash("Selecciona una imagen o video para tu historia.", "error")
+        return redirect(request.referrer or url_for("inicio"))
+
+    ext = archivo.filename.rsplit(".", 1)[-1].lower()
+    es_video = False
+    try:
+        if ext in ["png", "jpg", "jpeg", "webp"]:
+            res = cloudinary.uploader.upload(archivo, folder="stands_uta/historias")
+        elif ext in ["mp4", "webm", "mov"]:
+            res = cloudinary.uploader.upload(archivo, resource_type="video", folder="stands_uta/historias")
+            es_video = True
+        else:
+            flash("Formato inválido. Usa JPG, PNG, WEBP, MP4 o WEBM.", "error")
+            return redirect(request.referrer or url_for("inicio"))
+
+        url_media = res.get("secure_url")
+        expira = datetime.now() + timedelta(hours=24)
+
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "INSERT INTO historias (usuario_id, archivo_multimedia, es_video, expira_en) VALUES (%s, %s, %s, %s)",
+                (session["user_id"], url_media, es_video, expira)
+            )
+            if destacar:
+                cur.execute(
+                    "INSERT INTO historias_destacadas (usuario_id, titulo, archivo_multimedia, es_video) VALUES (%s, %s, %s, %s)",
+                    (session["user_id"], titulo_destacada[:40], url_media, es_video)
+                )
+        db.commit()
+        db.close()
+        flash("Historia publicada por 24 horas.", "ok")
+    except Exception as e:
+        flash(f"Error al subir historia: {e}", "error")
+
+    return redirect(request.referrer or url_for("inicio"))
+
+
+@app.route("/historia/destacar/<int:historia_id>", methods=["POST"])
+@login_requerido
+def destacar_historia(historia_id):
+    titulo = request.form.get("titulo", "").strip() or "Destacada"
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT * FROM historias WHERE id=%s AND usuario_id=%s", (historia_id, session["user_id"]))
+        h = cur.fetchone()
+        if h:
+            cur.execute(
+                "INSERT INTO historias_destacadas (usuario_id, titulo, archivo_multimedia, es_video) VALUES (%s, %s, %s, %s)",
+                (session["user_id"], titulo[:40], h["archivo_multimedia"], h["es_video"])
+            )
+            db.commit()
+            flash("Historia añadida a tus destacados.", "ok")
+    db.close()
+    return redirect(url_for("perfil"))
+
+
+@app.route("/historia/destacada/borrar/<int:destacada_id>", methods=["POST"])
+@login_requerido
+def borrar_destacada(destacada_id):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM historias_destacadas WHERE id=%s AND usuario_id=%s", (destacada_id, session["user_id"]))
+        db.commit()
+    db.close()
+    flash("Historia destacada eliminada.", "ok")
+    return redirect(url_for("perfil"))
+
+
+@app.route("/historia/restringir/<int:objetivo_id>/<tipo>", methods=["POST"])
+@login_requerido
+def restringir_historia(objetivo_id, tipo):
+    if tipo not in ("silencio", "bloqueo") or objetivo_id == session["user_id"]:
+        abort(400)
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM restricciones_historias WHERE usuario_id=%s AND objetivo_id=%s AND tipo=%s",
+            (session["user_id"], objetivo_id, tipo)
+        )
+        if cur.fetchone():
+            cur.execute(
+                "DELETE FROM restricciones_historias WHERE usuario_id=%s AND objetivo_id=%s AND tipo=%s",
+                (session["user_id"], objetivo_id, tipo)
+            )
+            flash(f"Se quitó el {tipo} de historias.", "ok")
+        else:
+            cur.execute(
+                "INSERT INTO restricciones_historias (usuario_id, objetivo_id, tipo) VALUES (%s, %s, %s)",
+                (session["user_id"], objetivo_id, tipo)
+            )
+            flash(f"Historias {tipo}adas correctamente.", "ok")
+        db.commit()
+    db.close()
+    return redirect(request.referrer or url_for("inicio"))
 
 
 if __name__ == "__main__":

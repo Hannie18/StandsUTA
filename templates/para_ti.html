@@ -1,33 +1,36 @@
 {% extends "app_base.html" %}
 {% block titulo %}Para ti · StandsUTA{% endblock %}
 
-{% if recomendados %}
-  <div style="background: var(--panel-bg, #1e1e1e); padding: 1rem; border-radius: 10px; margin-bottom: 1.5rem;">
-    <h3 style="font-size: 0.95rem; margin-bottom: 0.8rem;">💡 Perfiles recomendados para ti</h3>
-    <div style="display: flex; gap: 1rem; overflow-x: auto;">
-      {% for rec in recomendados %}
-        <div style="text-align: center; min-width: 90px;">
-          <a href="{{ url_for('perfil_publico', username=rec.username) }}" style="text-decoration: none; color: inherit;">
-            {% if rec.foto %}
-              <img src="{{ rec.foto }}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
-            {% else %}
-              <div class="avatar-min" style="margin: 0 auto; width: 50px; height: 50px; line-height: 50px;">U</div>
-            {% endif %}
-            <p style="font-size: 0.8rem; font-weight: bold; margin-top: 0.3rem;">@{{ rec.username }}</p>
-            {% if rec.nota_estado %}
-              <p style="font-size: 0.75rem; color: #888;">{{ rec.nota_estado }}</p>
-            {% endif %}
-          </a>
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-{% endif %}
-
 {% block contenido %}
   <header class="barra-sup">
     <h1>Para ti</h1>
   </header>
+  <!-- BARRA DE HISTORIAS (24H) -->
+  <section class="barra-historias">
+    <!-- Botón para subir historia propia -->
+    <button type="button" class="item-historia btn-subir-historia" onclick="document.getElementById('dlg-subir-historia').showModal()">
+      <div class="aro-historia aro-nuevo">
+        <div class="avatar-historia">+</div>
+      </div>
+      <span>Tu historia</span>
+    </button>
+
+    <!-- Círculos de historias activas -->
+    {% for uh in usuarios_historias %}
+      <button type="button" class="item-historia btn-abrir-historia"
+              data-username="@{{ uh.username }}"
+              data-items='{{ uh.items | tojson | safe }}'>
+        <div class="aro-historia">
+          {% if uh.foto %}
+            <img src="{{ uh.foto }}" alt="@{{ uh.username }}" class="avatar-historia">
+          {% else %}
+            <div class="avatar-historia">{{ uh.username[0]|upper }}</div>
+          {% endif %}
+        </div>
+        <span>@{{ uh.username }}</span>
+      </button>
+    {% endfor %}
+  </section>
   <!-- Bloque de Perfiles Recomendados -->
   {% if recomendados %}
     <section class="tarjeta-post" style="padding: 1rem; margin-bottom: 1.5rem; background: var(--panel-bg, #ffffff);">
@@ -145,7 +148,51 @@
     </div>
   </dialog>
 {% endblock %}
+<!-- MODAL: SUBIR HISTORIA -->
+  <dialog id="dlg-subir-historia" class="modal-media-dialog">
+    <form action="{{ url_for('subir_historia') }}" method="post" enctype="multipart/form-data" class="formulario">
+      <h2 style="margin-top:0;">📸 Nueva Historia (24h)</h2>
+      <label for="media-historia">Foto o Video corto</label>
+      <input type="file" id="media-historia" name="multimedia" accept="image/*,video/mp4,video/webm" required>
 
+      <label style="display:flex; align-items:center; gap:0.5rem; margin-top:0.8rem; cursor:pointer;">
+        <input type="checkbox" name="destacar" value="1" onchange="document.getElementById('box-titulo-dest').hidden = !this.checked">
+        Guardar también en Destacados del perfil
+      </label>
+
+      <div id="box-titulo-dest" hidden>
+        <label for="titulo_destacada">Nombre del destacado</label>
+        <input type="text" id="titulo_destacada" name="titulo_destacada" maxlength="40" placeholder="Ej: Feria UTA, Proyectos...">
+      </div>
+
+      <div class="acciones" style="margin-top:1rem;">
+        <button type="submit" class="boton">Publicar Historia</button>
+        <button type="button" class="boton-sec" onclick="document.getElementById('dlg-subir-historia').close()">Cancelar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL: VISOR DE HISTORIAS -->
+  <dialog id="dlg-visor-historia" class="modal-visor-historia">
+    <div class="visor-contenido">
+      <div id="visor-barras" class="visor-barras"></div>
+      <div class="visor-header">
+        <div>
+          <strong id="visor-autor">@usuario</strong>
+          <small id="visor-hora" style="opacity:0.8; margin-left:0.4rem;"></small>
+        </div>
+        <button type="button" id="cerrar-visor-hist" class="cerrar-visor">&times;</button>
+      </div>
+
+      <div id="visor-media" class="visor-media" onclick="siguienteHistoria()"></div>
+
+      <!-- Opción rápida para guardar en destacados si es tu historia -->
+      <form id="form-destacar-desde-visor" method="post" class="visor-footer" hidden>
+        <input type="text" name="titulo" placeholder="Título destacado..." maxlength="40" class="input-comentario" style="background:#fff;">
+        <button type="submit" class="boton btn-sm">⭐ Destacar</button>
+      </form>
+    </div>
+  </dialog>
 {% block scripts %}
 <script>
   document.addEventListener('DOMContentLoaded', () => {
@@ -233,5 +280,85 @@
       });
     }
   });
+
+  const visorHist = document.getElementById('dlg-visor-historia');
+  const visorMedia = document.getElementById('visor-media');
+  const visorAutor = document.getElementById('visor-autor');
+  const visorHora = document.getElementById('visor-hora');
+  const visorBarras = document.getElementById('visor-barras');
+  const formDestacarVisor = document.getElementById('form-destacar-desde-visor');
+  const miUserId = Number ("{{ session['user_id'] }}");
+  let colaHistorias = [];
+  let indiceHistoria = 0;
+  let timerHistoria = null;
+
+  function renderHistoriaActual() {
+    clearTimeout(timerHistoria);
+    if (indiceHistoria >= colaHistorias.length) {
+      cerrarVisorHistoria();
+      return;
+    }
+    const h = colaHistorias[indiceHistoria];
+    visorHora.textContent = h.hora || '';
+
+    // Barras superiores estilo Instagram
+    visorBarras.innerHTML = colaHistorias.map((_, idx) =>
+      `<div class="barra-prog ${idx <= indiceHistoria ? 'activa' : ''}"></div>`
+    ).join('');
+
+    const esVid = (h.es_video === true || h.es_video === 1 || h.es_video === 'True');
+    if (esVid) {
+      visorMedia.innerHTML = `<video src="${h.archivo_multimedia}" autoplay playsinline onended="siguienteHistoria()"></video>`;
+    } else {
+      visorMedia.innerHTML = `<img src="${h.archivo_multimedia}" alt="Historia">`;
+      timerHistoria = setTimeout(siguienteHistoria, 5000); // 5 seg por foto
+    }
+
+    // Mostrar opción de destacar si es historia propia con ID
+    if (h.id && h.usuario_id == miUserId && formDestacarVisor) {
+      formDestacarVisor.hidden = false;
+      formDestacarVisor.action = '/historia/destacar/' + h.id;
+    } else if (formDestacarVisor) {
+      formDestacarVisor.hidden = true;
+    }
+  }
+
+  function siguienteHistoria() {
+    indiceHistoria++;
+    renderHistoriaActual();
+  }
+
+  function cerrarVisorHistoria() {
+    clearTimeout(timerHistoria);
+    if (visorMedia) visorMedia.innerHTML = '';
+    if (visorHist) visorHist.close();
+  }
+
+  document.querySelectorAll('.btn-abrir-historia').forEach(btn => {
+    btn.addEventListener('click', () => {
+      colaHistorias = JSON.parse(btn.getAttribute('data-items') || '[]');
+      if (!colaHistorias.length) return;
+      visorAutor.textContent = btn.getAttribute('data-username');
+      indiceHistoria = 0;
+      renderHistoriaActual();
+      visorHist.showModal();
+    });
+  });
+
+  document.querySelectorAll('.btn-ver-destacada').forEach(btn => {
+    btn.addEventListener('click', () => {
+      visorAutor.textContent = '⭐ ' + btn.getAttribute('data-titulo');
+      colaHistorias = [{
+        archivo_multimedia: btn.getAttribute('data-url'),
+        es_video: btn.getAttribute('data-video')
+      }];
+      indiceHistoria = 0;
+      renderHistoriaActual();
+      visorHist.showModal();
+    });
+  });
+
+  const btnCerrarVisor = document.getElementById('cerrar-visor-hist');
+  if (btnCerrarVisor) btnCerrarVisor.addEventListener('click', cerrarVisorHistoria);
 </script>
 {% endblock %}

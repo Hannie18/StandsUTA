@@ -320,3 +320,136 @@ textarea:focus-visible {
   font-weight: 600;
   text-align: center;
 }
+
+/* --- HISTORIAS Y DESTACADAS --- */
+.barra-historias, .barra-destacadas {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding: 0.75rem 0.25rem 1.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #f2d3d6;
+}
+
+.item-historia {
+  background: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 72px;
+  cursor: pointer;
+  color: var(--negro);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.item-historia span {
+  max-width: 74px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aro-historia {
+  padding: 3px;
+  border-radius: 50%;
+  background: linear-gradient(45deg, var(--vino), var(--rojo), var(--coral));
+  display: inline-flex;
+}
+
+.aro-historia.aro-nuevo {
+  background: #e3b4b8;
+}
+
+.aro-destacada {
+  padding: 3px;
+  border-radius: 50%;
+  border: 2px solid #e3b4b8;
+  display: inline-flex;
+}
+
+.avatar-historia {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #fff;
+  background: var(--vino);
+  color: var(--rosa);
+  display: grid;
+  place-items: center;
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+/* Visor pantalla completa tipo Instagram */
+.modal-visor-historia {
+  border: 0;
+  border-radius: 16px;
+  padding: 0;
+  width: min(420px, 95vw);
+  height: 80vh;
+  background: #120605;
+  color: #fff;
+  margin: auto;
+  overflow: hidden;
+}
+.modal-visor-historia::backdrop { background: rgba(0, 0, 0, 0.85); }
+
+.visor-contenido {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.visor-barras {
+  display: flex;
+  gap: 4px;
+  padding: 10px 12px 4px;
+}
+.barra-prog {
+  flex: 1;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 99px;
+}
+.barra-prog.activa { background: #fff; }
+
+.visor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 14px;
+}
+.cerrar-visor {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.6rem;
+  cursor: pointer;
+}
+
+.visor-media {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+}
+.visor-media img, .visor-media video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.visor-footer {
+  padding: 10px 12px;
+  display: flex;
+  gap: 0.5rem;
+  background: rgba(0,0,0,0.6);
+}
