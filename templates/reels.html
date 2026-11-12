@@ -1,0 +1,151 @@
+{% extends "app_base.html" %}
+{% block titulo %}Reels · StandsUTA{% endblock %}
+
+{% block contenido %}
+  <header class="barra-sup">
+    <h1>Reels</h1>
+    <button type="button" class="boton btn-sm" style="margin:0;" onclick="document.getElementById('dlg-crear-reel').showModal()">
+      + Crear Reel
+    </button>
+  </header>
+
+  <div class="feed-reels">
+    {% for r in reels %}
+      <article class="tarjeta-reel">
+        <video src="{{ r.video_url }}" controls loop playsinline class="video-reel"></video>
+
+        <div class="overlay-reel">
+          <a href="{{ url_for('perfil_publico', username=r.username) }}" class="autor-reel">
+            {% if r.usuario_foto %}
+              <img src="{{ r.usuario_foto }}" alt="@{{ r.username }}">
+            {% else %}
+              <div class="avatar-min">{{ r.username[0]|upper }}</div>
+            {% endif %}
+            <strong>@{{ r.username }}</strong>
+          </a>
+
+          <!-- Única interacción permitida: Me gusta -->
+          <button type="button" class="btn-like-reel" data-id="{{ r.id }}" title="Me gusta">
+            <span id="reel-heart-{{ r.id }}" style="font-size: 1.5rem;">{{ '❤️' if r.dio_like else '🤍' }}</span>
+            <span id="reel-likes-{{ r.id }}" style="font-size: 0.85rem; font-weight: 700;">{{ r.total_likes }}</span>
+          </button>
+        </div>
+      </article>
+    {% else %}
+      <section class="vacio">
+        <p><strong>Aún no hay Reels publicados</strong></p>
+        <p>Sube el primer video corto usando el botón <strong>+ Crear Reel</strong>.</p>
+      </section>
+    {% endfor %}
+  </div>
+
+  <!-- MODAL: CREAR REEL (SOLO VIDEOS) -->
+  <dialog id="dlg-crear-reel" class="modal-media-dialog">
+    <form action="{{ url_for('crear_reel') }}" method="post" enctype="multipart/form-data" class="formulario">
+      <h2 style="margin-top:0;">🎬 Crear nuevo Reel</h2>
+      <label for="video-reel">Selecciona un video (MP4, WEBM o MOV · Máx. 15 MB)</label>
+      <input type="file" id="video-reel" name="video" accept="video/mp4,video/webm,video/quicktime" required>
+
+      <div class="acciones" style="margin-top:1rem;">
+        <button type="submit" class="boton">Publicar Reel</button>
+        <button type="button" class="boton-sec" onclick="document.getElementById('dlg-crear-reel').close()">Cancelar</button>
+      </div>
+    </form>
+  </dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.btn-like-reel').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const reelId = btn.getAttribute('data-id');
+        const res = await fetch('/reels/like/' + reelId, { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          document.getElementById('reel-heart-' + reelId).textContent = data.le_gusta ? '❤️' : '🤍';
+          document.getElementById('reel-likes-' + reelId).textContent = data.total;
+        }
+      });
+    });
+  });
+</script>
+
+<style>
+  .feed-reels {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .tarjeta-reel {
+    position: relative;
+    width: 100%;
+    max-width: 380px;
+    height: 68vh;
+    min-height: 460px;
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid #f2b8bd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .video-reel {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .overlay-reel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 52px; /* deja libre la barra de controles del video */
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.65), transparent);
+    pointer-events: none;
+  }
+
+  .autor-reel {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: #fff;
+    text-decoration: none;
+    pointer-events: auto;
+  }
+
+  .autor-reel img {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--coral);
+  }
+
+  .btn-like-reel {
+    background: rgba(42, 14, 12, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    border-radius: 14px;
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  .btn-like-reel:hover {
+    background: var(--rojo);
+  }
+</style>
+{% endblock %}

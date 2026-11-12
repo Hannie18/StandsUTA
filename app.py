@@ -1149,6 +1149,85 @@ def cambiar_fondo_chat(chat_id):
     db.close()
     return redirect(url_for("mensajeria", chat_id=chat_id))
 
+# ---------- REELS (SOLO VIDEOS Y ME GUSTA) ----------
+@app.route("/reels")
+@login_requerido
+def reels():
+    user_id = session["user_id"]
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("""
+            SELECT r.*, u.username, u.foto AS usuario_foto,
+              (SELECT COUNT(*) FROM reel_likes WHERE reel_id = r.id) AS total_likes,
+              (SELECT COUNT(*) FROM reel_likes WHERE reel_id = r.id AND usuario_id = %s) AS dio_like
+            FROM reels r
+            JOIN usuarios u ON r.usuario_id = u.id
+            WHERE r.usuario_id NOT IN (
+                SELECT perfil_id FROM bloqueos_silencios WHERE usuario_id = %s
+            )
+            ORDER BY r.creado_en DESC
+        """, (user_id, user_id))
+        lista_reels = cur.fetchall()
+    db.close()
+    return render_template("reels.html", reels=lista_reels, seccion="reels")
+
+
+@app.route("/reels/crear", methods=["POST"])
+@login_requerido
+def crear_reel():
+    archivo = request.files.get("video")
+    if not archivo or not archivo.filename:
+        flash("Selecciona un video para publicar tu Reel.", "error")
+        return redirect(url_for("reels"))
+
+    ext = archivo.filename.rsplit(".", 1)[-1].lower()
+    if ext not in ["mp4", "webm", "mov"]:
+        flash("Solo se permiten archivos de video (MP4, WEBM o MOV).", "error")
+        return redirect(url_for("reels"))
+
+    try:
+        res = cloudinary.uploader.upload(
+            archivo,
+            resource_type="video",
+            folder="stands_uta/reels"
+        )
+        video_url = res.get("secure_url")
+
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "INSERT INTO reels (usuario_id, video_url) VALUES (%s, %s)",
+                (session["user_id"], video_url)
+            )
+        db.commit()
+        db.close()
+        flash("Reel publicado correctamente.", "ok")
+    except Exception as e:
+        flash(f"Error al subir el video: {e}", "error")
+
+    return redirect(url_for("reels"))
+
+
+@app.route("/reels/like/<int:reel_id>", methods=["POST"])
+@login_requerido
+def like_reel(reel_id):
+    user_id = session["user_id"]
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT 1 FROM reel_likes WHERE usuario_id=%s AND reel_id=%s", (user_id, reel_id))
+        if cur.fetchone():
+            cur.execute("DELETE FROM reel_likes WHERE usuario_id=%s AND reel_id=%s", (user_id, reel_id))
+            le_gusta = False
+        else:
+            cur.execute("INSERT INTO reel_likes (usuario_id, reel_id) VALUES (%s, %s)", (user_id, reel_id))
+            le_gusta = True
+        db.commit()
+
+        cur.execute("SELECT COUNT(*) AS total FROM reel_likes WHERE reel_id=%s", (reel_id,))
+        total = cur.fetchone()["total"]
+    db.close()
+    return {"status": "ok", "le_gusta": le_gusta, "total": total}
+
 
 if __name__ == "__main__":
     app.run(debug=True)

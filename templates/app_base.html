@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 <body>
-  {% from "iconos.html" import casa, usuario as icono_usuario, salir as icono_salir, mensaje as icono_mensaje %}
+  {% from "iconos.html" import casa, usuario as icono_usuario, salir as icono_salir, mensaje as icono_mensaje, reel as icono_reel %}
   <div class="app">
     <nav class="lateral" aria-label="Principal">
       <p class="logo">StandsUTA</p>
@@ -30,6 +30,14 @@
       <!-- MENSAJES COLOCADO JUSTO DEBAJO DE PERFIL CON SU ICONO SVG -->
       <a class="nav-item" href="{{ url_for('mensajeria') }}" {% if seccion == 'mensajes' %}aria-current="page"{% endif %}>
         {{ icono_mensaje() }}<span>Mensajes</span>
+      </a>
+
+      <a class="nav-item" href="{{ url_for('mensajeria') }}" {% if seccion == 'mensajes' %}aria-current="page"{% endif %}>
+        {{ icono_mensaje() }}<span>Mensajes</span>
+      </a>
+
+      <a class="nav-item" href="{{ url_for('reels') }}" {% if seccion == 'reels' %}aria-current="page"{% endif %}>
+        {{ icono_reel() }}<span>Reels</span>
       </a>
 
       <!-- SALIR PERMANECE AL FINAL -->
