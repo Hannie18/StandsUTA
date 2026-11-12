@@ -10,30 +10,109 @@
     {% endif %}
   </header>
 
-  <!-- CABECERA DEL PERFIL -->
-<!-- BOTONES DE SILENCIAR / BLOQUEAR HISTORIAS (Solo en perfiles ajenos) -->
-  {% if not es_mio %}
-    <div style="display:flex; gap:0.5rem; justify-content:center; margin-bottom:1rem;">
-      <form action="{{ url_for('restringir_historia', objetivo_id=u.id, tipo='silencio') }}" method="post">
-        <button type="submit" class="boton-sec btn-sm">
-          {{ '🔔 Activar historias' if 'silencio' in restricciones_hist else '🔕 Silenciar historias' }}
-        </button>
+  <!-- 1. CABECERA ORIGINAL DEL PERFIL (Foto de perfil + Cifras) -->
+  <section class="cabecera">
+    <div class="{% if historias_activas %}aro-historia aro-perfil btn-abrir-historia{% endif %}"
+         {% if historias_activas %}
+           style="cursor:pointer;"
+           data-username="@{{ u.username }}"
+           data-items='{{ historias_json | safe }}'
+         {% endif %}>
+      {% if u.foto %}
+        <img class="avatar" src="{{ u.foto }}" alt="Foto de perfil de @{{ u.username }}">
+      {% else %}
+        <div class="avatar" role="img" aria-label="Sin foto de perfil">{{ icono_usuario() }}</div>
+      {% endif %}
+    </div>
+    <ul class="cifras">
+      <li><strong>{{ publicaciones|length }}</strong><span>publicaciones</span></li>
+      <li><strong id="contador-seguidores">{{ total_seguidores or 0 }}</strong><span>seguidores</span></li>
+      <li><strong>{{ total_seguidos or 0 }}</strong><span>seguidos</span></li>
+    </ul>
+  </section>
+
+  <!-- 2. DATOS DEL USUARIO Y NOTA CON EMOJI (Sin cambios) -->
+  <section class="datos">
+    <p class="nombre">{{ nombre_completo }}</p>
+    {% if u.nota_estado %}
+      <div style="background: rgba(0,0,0,0.05); padding: 0.4rem 0.8rem; border-radius: 15px; display: inline-block; margin: 0.4rem 0;">
+        💭 <span>{{ u.nota_estado }}</span>
+      </div>
+    {% endif %}
+
+    {% if es_mio %}
+      <form action="{{ url_for('actualizar_nota') }}" method="post" style="display: flex; gap: 0.4rem; margin-top: 0.5rem;">
+        <input type="text" name="nota_estado" maxlength="100" placeholder="¿Cómo te sientes? Ej: ¡Listo para la feria! 🚀" value="{{ u.nota_estado or '' }}" class="input-comentario" style="font-size:0.85rem;">
+        <button type="submit" class="boton-sec btn-sm">Guardar Nota</button>
       </form>
-      <form action="{{ url_for('restringir_historia', objetivo_id=u.id, tipo='bloqueo') }}" method="post">
-        <button type="submit" class="boton-sec btn-sm btn-borrar">
-          {{ '✅ Desbloquear historias' if 'bloqueo' in restricciones_hist else '🚫 Ocultar mis historias' }}
+    {% endif %}
+
+    {% if u.pronombres %}<p class="detalle">Pronombres: {{ u.pronombres }}</p>{% endif %}
+    {% if sexo %}<p class="detalle">Sexo: {{ sexo }}</p>{% endif %}
+    {% if enlaces %}
+      <ul class="enlaces">
+        {% for e in enlaces %}
+          <li><a href="{{ e.url }}" target="_blank" rel="noopener noreferrer">{{ e.texto }}</a></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </section>
+
+  <!-- 3. ACCIONES PRINCIPALES (Sin cambios) -->
+  {% if es_mio %}
+    <div class="acciones">
+      <a class="boton" href="{{ url_for('editar_perfil') }}">Editar perfil</a>
+      <button class="boton-sec" type="button" id="abrir-qr">Compartir perfil</button>
+    </div>
+    <div style="text-align: center; margin: 15px 0;">
+      <a href="{{ url_for('publicar') }}" class="boton">+ Crear nuevo Stand</a>
+    </div>
+  {% else %}
+    <div class="acciones" style="display: flex; flex-direction: column; align-items: center; gap: 0.8rem; margin: 1.5rem 0;">
+      <div style="display: flex; gap: 0.6rem; justify-content: center; align-items: center; flex-wrap: wrap;">
+        <button class="boton" type="button" id="btn-seguir" data-id="{{ u.id }}" style="margin: 0; min-width: 170px; padding: 0.6rem 1.2rem; white-space: nowrap; text-align: center;">
+          {{ 'Siguiendo' if lo_sigo else 'Seguir' }}
         </button>
-      </form>
+
+        <form action="{{ url_for('iniciar_chat_individual', otro_user_id=u.id) }}" method="post" style="display: inline; margin: 0;">
+          <button class="boton-sec" type="submit" style="margin: 0; min-width: 170px; padding: 0.6rem 1.2rem; white-space: nowrap; text-align: center;">
+            Enviar mensaje
+          </button>
+        </form>
+
+        <button class="boton-sec" type="button" id="abrir-qr" style="margin: 0; min-width: 170px; padding: 0.6rem 1.2rem; white-space: nowrap; text-align: center;">
+          Compartir perfil
+        </button>
+      </div>
+
+      <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: center; margin-top: 0.2rem; flex-wrap: wrap;">
+        <form action="{{ url_for('accion_perfil', perfil_id=u.id, tipo='silencio') }}" method="post" style="display: inline; margin: 0;">
+          <button class="boton-sec btn-sm" type="submit">Silenciar</button>
+        </form>
+        <form action="{{ url_for('accion_perfil', perfil_id=u.id, tipo='bloqueo') }}" method="post" style="display: inline; margin: 0;" onsubmit="return confirm('¿Deseas bloquear a este perfil?');">
+          <button class="boton-sec btn-sm btn-borrar" type="submit">Bloquear</button>
+        </form>
+        <form action="{{ url_for('restringir_historia', objetivo_id=u.id, tipo='silencio') }}" method="post" style="display: inline; margin: 0;">
+          <button type="submit" class="boton-sec btn-sm">
+            {{ '🔔 Activar historias' if 'silencio' in restricciones_hist else '🔕 Silenciar historias' }}
+          </button>
+        </form>
+        <form action="{{ url_for('restringir_historia', objetivo_id=u.id, tipo='bloqueo') }}" method="post" style="display: inline; margin: 0;">
+          <button type="submit" class="boton-sec btn-sm btn-borrar">
+            {{ '✅ Desbloquear historias' if 'bloqueo' in restricciones_hist else '🚫 Ocultar mis historias' }}
+          </button>
+        </form>
+      </div>
     </div>
   {% endif %}
 
-  <!-- HISTORIAS DESTACADAS DEL PERFIL -->
+  <!-- 4. ICONO DE AGREGAR HISTORIA Y DESTACADOS (Debajo de "+ Crear nuevo Stand", alineado a la izquierda) -->
   {% if destacadas or es_mio %}
-    <section class="barra-destacadas">
+    <section class="barra-destacadas" style="justify-content: flex-start;">
       {% if es_mio %}
         <button type="button" class="item-historia" onclick="document.getElementById('dlg-subir-historia').showModal()">
           <div class="aro-destacada"><div class="avatar-historia">+</div></div>
-          <span>Nuevo</span>
+          <span>Nueva historia</span>
         </button>
       {% endif %}
 
@@ -62,74 +141,7 @@
     </section>
   {% endif %}
 
-  <!-- DATOS DEL USUARIO Y NOTA CON EMOJI -->
-  <section class="datos">
-    <p class="nombre">{{ nombre_completo }}</p>
-    {% if u.nota_estado %}
-      <div style="background: rgba(0,0,0,0.05); padding: 0.4rem 0.8rem; border-radius: 15px; display: inline-block; margin: 0.4rem 0;">
-        💭 <span>{{ u.nota_estado }}</span>
-      </div>
-    {% endif %}
-
-    {% if es_mio %}
-      <form action="{{ url_for('actualizar_nota') }}" method="post" style="display: flex; gap: 0.4rem; margin-top: 0.5rem;">
-        <input type="text" name="nota_estado" maxlength="100" placeholder="¿Cómo te sientes? Ej: ¡Listo para la feria! 🚀" value="{{ u.nota_estado or '' }}" class="input-comentario" style="font-size:0.85rem;">
-        <button type="submit" class="boton-sec btn-sm">Guardar Nota</button>
-      </form>
-    {% endif %}
-
-    {% if u.pronombres %}<p class="detalle">Pronombres: {{ u.pronombres }}</p>{% endif %}
-    {% if sexo %}<p class="detalle">Sexo: {{ sexo }}</p>{% endif %}
-    {% if enlaces %}
-      <ul class="enlaces">
-        {% for e in enlaces %}
-          <li><a href="{{ e.url }}" target="_blank" rel="noopener noreferrer">{{ e.texto }}</a></li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-  </section>
-
-  <!-- ACCIONES PRINCIPALES -->
-<!-- ACCIONES PRINCIPALES Y MODERACIÓN -->
-  {% if es_mio %}
-    <div class="acciones">
-      <a class="boton" href="{{ url_for('editar_perfil') }}">Editar perfil</a>
-      <button class="boton-sec" type="button" id="abrir-qr">Compartir perfil</button>
-    </div>
-    <div style="text-align: center; margin: 15px 0;">
-      <a href="{{ url_for('publicar') }}" class="boton">+ Crear nuevo Stand</a>
-    </div>
-  {% else %}
-    <div class="acciones" style="display: flex; flex-direction: column; align-items: center; gap: 0.8rem; margin: 1.5rem 0;">
-      <!-- Fila 1: Botones largos con espacio suficiente para una sola línea de texto -->
-      <div style="display: flex; gap: 0.6rem; justify-content: center; align-items: center; flex-wrap: wrap;">
-        <button class="boton" type="button" id="btn-seguir" data-id="{{ u.id }}" style="margin: 0; min-width: 170px; padding: 0.6rem 1.2rem; white-space: nowrap; text-align: center;">
-          {{ 'Siguiendo' if lo_sigo else 'Seguir' }}
-        </button>
-
-        <form action="{{ url_for('iniciar_chat_individual', otro_user_id=u.id) }}" method="post" style="display: inline; margin: 0;">
-          <button class="boton-sec" type="submit" style="margin: 0; min-width: 170px; padding: 0.6rem 1.2rem; white-space: nowrap; text-align: center;">
-            Enviar mensaje
-          </button>
-        </form>
-
-        <button class="boton-sec" type="button" id="abrir-qr" style="margin: 0; min-width: 170px; padding: 0.6rem 1.2rem; white-space: nowrap; text-align: center;">
-          Compartir perfil
-        </button>
-      </div>
-
-      <!-- Fila 2: Botones secundarios centrados abajo -->
-      <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: center; margin-top: 0.2rem;">
-        <form action="{{ url_for('accion_perfil', perfil_id=u.id, tipo='silencio') }}" method="post" style="display: inline; margin: 0;">
-          <button class="boton-sec btn-sm" type="submit">Silenciar</button>
-        </form>
-        <form action="{{ url_for('accion_perfil', perfil_id=u.id, tipo='bloqueo') }}" method="post" style="display: inline; margin: 0;" onsubmit="return confirm('¿Deseas bloquear a este perfil?');">
-          <button class="boton-sec btn-sm btn-borrar" type="submit">Bloquear</button>
-        </form>
-      </div>
-    </div>
-  {% endif %}
-  <!-- GRILLA DE PUBLICACIONES -->
+  <!-- 5. GRILLA DE PUBLICACIONES (Sin cambios) -->
   <section class="galeria-stands">
     {% for pub in publicaciones %}
       <div class="stand-item item-perfil-media" 
@@ -209,7 +221,6 @@
         <button type="button" id="cerrar-config" style="background:none; border:none; font-size: 1.5rem; cursor:pointer;">&times;</button>
       </div>
 
-      <!-- Pestañas -->
       <div style="display: flex; gap: 0.4rem; margin-bottom: 1rem; border-bottom: 1px solid #ddd; overflow-x: auto;">
         <button class="btn-tab active" onclick="verTab(event, 'gestor-cuentas')">👥 Cuentas</button>
         <button class="btn-tab" onclick="verTab(event, 'gestor-tiempo')">⏱️ Tiempo</button>
@@ -217,7 +228,6 @@
         <button class="btn-tab" onclick="verTab(event, 'gestor-calendario')">📅 Calendario</button>
       </div>
 
-      <!-- TAB 1: Gestor de Cuentas -->
       <div id="gestor-cuentas" class="tab-contenido">
         <h4 style="margin-top:0;">Cuentas asociadas a este Email</h4>
         {% if cuentas_vinculadas %}
@@ -234,7 +244,6 @@
         {% endif %}
       </div>
 
-      <!-- TAB 2: Límite de Tiempo -->
       <div id="gestor-tiempo" class="tab-contenido" style="display: none;">
         <h4 style="margin-top:0;">Tiempo Límite Diario</h4>
         <p style="font-size: 0.8rem; color: #666;">Selecciona cuánto tiempo deseas usar la aplicación al día. Al superarlo se bloqueará por 12 horas.</p>
@@ -249,7 +258,6 @@
         </form>
       </div>
 
-      <!-- TAB 3: Favoritos (Publicaciones Guardadas) -->
       <div id="gestor-favoritos" class="tab-contenido" style="display: none;">
         <h4 style="margin-top:0;">Publicaciones Guardadas</h4>
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; max-height: 200px; overflow-y: auto;">
@@ -267,7 +275,6 @@
         </div>
       </div>
 
-      <!-- TAB 4: Biblioteca / Calendario -->
       <div id="gestor-calendario" class="tab-contenido" style="display: none;">
         <h4 style="margin-top:0;">Historial de Publicaciones</h4>
         <div style="max-height: 200px; overflow-y: auto;">
@@ -291,11 +298,134 @@
       </div>
     </dialog>
   {% endif %}
+
+  <!-- MODAL 4: SUBIR HISTORIA (Este es el que abre al tocar "+ Nueva historia") -->
+  <dialog id="dlg-subir-historia" class="modal-media-dialog">
+    <form action="{{ url_for('subir_historia') }}" method="post" enctype="multipart/form-data" class="formulario">
+      <h2 style="margin-top:0;">📸 Nueva Historia (24h)</h2>
+      <label for="media-historia">Selecciona tu foto o video</label>
+      <input type="file" id="media-historia" name="multimedia" accept="image/*,video/mp4,video/webm" required>
+
+      <label style="display:flex; align-items:center; gap:0.5rem; margin-top:0.8rem; cursor:pointer;">
+        <input type="checkbox" name="destacar" value="1" onchange="document.getElementById('box-titulo-dest').hidden = !this.checked">
+        Guardar también en Destacados del perfil
+      </label>
+
+      <div id="box-titulo-dest" hidden>
+        <label for="titulo_destacada">Nombre del destacado</label>
+        <input type="text" id="titulo_destacada" name="titulo_destacada" maxlength="40" placeholder="Ej: Feria UTA, Proyectos...">
+      </div>
+
+      <div class="acciones" style="margin-top:1rem;">
+        <button type="submit" class="boton">Publicar Historia</button>
+        <button type="button" class="boton-sec" onclick="document.getElementById('dlg-subir-historia').close()">Cancelar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL 5: VISOR DE HISTORIAS (Abre al tocar tu foto de perfil o una destacada) -->
+  <dialog id="dlg-visor-historia" class="modal-visor-historia">
+    <div class="visor-contenido">
+      <div id="visor-barras" class="visor-barras"></div>
+      <div class="visor-header">
+        <div>
+          <strong id="visor-autor">@usuario</strong>
+          <small id="visor-hora" style="opacity:0.8; margin-left:0.4rem;"></small>
+        </div>
+        <button type="button" id="cerrar-visor-hist" class="cerrar-visor">&times;</button>
+      </div>
+
+      <div id="visor-media" class="visor-media" onclick="siguienteHistoria()"></div>
+
+      <form id="form-destacar-desde-visor" method="post" class="visor-footer" hidden>
+        <input type="text" name="titulo" placeholder="Título destacado..." maxlength="40" class="input-comentario" style="background:#fff;">
+        <button type="submit" class="boton btn-sm">⭐ Destacar</button>
+      </form>
+    </div>
+  </dialog>
 {% endblock %}
 
 {% block scripts %}
 <script>
+  const visorHist = document.getElementById('dlg-visor-historia');
+  const visorMedia = document.getElementById('visor-media');
+  const visorAutor = document.getElementById('visor-autor');
+  const visorHora = document.getElementById('visor-hora');
+  const visorBarras = document.getElementById('visor-barras');
+  const formDestacarVisor = document.getElementById('form-destacar-desde-visor');
+  const miUserId = Number("{{ session['user_id'] }}");
+  let colaHistorias = [];
+  let indiceHistoria = 0;
+  let timerHistoria = null;
+
+  function renderHistoriaActual() {
+    clearTimeout(timerHistoria);
+    if (indiceHistoria >= colaHistorias.length) {
+      cerrarVisorHistoria();
+      return;
+    }
+    const h = colaHistorias[indiceHistoria];
+    visorHora.textContent = h.hora || '';
+
+    visorBarras.innerHTML = colaHistorias.map((_, idx) =>
+      `<div class="barra-prog ${idx <= indiceHistoria ? 'activa' : ''}"></div>`
+    ).join('');
+
+    const esVid = (h.es_video === true || h.es_video === 1 || h.es_video === 'True');
+    if (esVid) {
+      visorMedia.innerHTML = `<video src="${h.archivo_multimedia}" autoplay playsinline onended="siguienteHistoria()"></video>`;
+    } else {
+      visorMedia.innerHTML = `<img src="${h.archivo_multimedia}" alt="Historia">`;
+      timerHistoria = setTimeout(siguienteHistoria, 5000);
+    }
+
+    if (h.id && h.usuario_id == miUserId && formDestacarVisor) {
+      formDestacarVisor.hidden = false;
+      formDestacarVisor.action = '/historia/destacar/' + h.id;
+    } else if (formDestacarVisor) {
+      formDestacarVisor.hidden = true;
+    }
+  }
+
+  function siguienteHistoria() {
+    indiceHistoria++;
+    renderHistoriaActual();
+  }
+
+  function cerrarVisorHistoria() {
+    clearTimeout(timerHistoria);
+    if (visorMedia) visorMedia.innerHTML = '';
+    if (visorHist) visorHist.close();
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.btn-abrir-historia').forEach(btn => {
+      btn.addEventListener('click', () => {
+        colaHistorias = JSON.parse(btn.getAttribute('data-items') || '[]');
+        if (!colaHistorias.length) return;
+        visorAutor.textContent = btn.getAttribute('data-username');
+        indiceHistoria = 0;
+        renderHistoriaActual();
+        visorHist.showModal();
+      });
+    });
+
+    document.querySelectorAll('.btn-ver-destacada').forEach(btn => {
+      btn.addEventListener('click', () => {
+        visorAutor.textContent = '⭐ ' + btn.getAttribute('data-titulo');
+        colaHistorias = [{
+          archivo_multimedia: btn.getAttribute('data-url'),
+          es_video: btn.getAttribute('data-video')
+        }];
+        indiceHistoria = 0;
+        renderHistoriaActual();
+        visorHist.showModal();
+      });
+    });
+
+    const btnCerrarVisor = document.getElementById('cerrar-visor-hist');
+    if (btnCerrarVisor) btnCerrarVisor.addEventListener('click', cerrarVisorHistoria);
+
     // Modal de Configuración ⚙️
     const dlgConfig = document.getElementById('dlg-config');
     const btnAbrirConfig = document.getElementById('abrir-config');
@@ -434,7 +564,6 @@
     }
   });
 
-  // Cambio de pestaña dentro del modal de configuración
   function verTab(e, tabId) {
     document.querySelectorAll('.tab-contenido').forEach(tab => tab.style.display = 'none');
     document.querySelectorAll('.btn-tab').forEach(btn => btn.classList.remove('active'));
@@ -442,86 +571,6 @@
     document.getElementById(tabId).style.display = 'block';
     e.currentTarget.classList.add('active');
   }
-
-  const visorHist = document.getElementById('dlg-visor-historia');
-  const visorMedia = document.getElementById('visor-media');
-  const visorAutor = document.getElementById('visor-autor');
-  const visorHora = document.getElementById('visor-hora');
-  const visorBarras = document.getElementById('visor-barras');
-  const formDestacarVisor = document.getElementById('form-destacar-desde-visor');
-  const miUserId = Number ("{{ session['user_id'] }}");
-  let colaHistorias = [];
-  let indiceHistoria = 0;
-  let timerHistoria = null;
-
-  function renderHistoriaActual() {
-    clearTimeout(timerHistoria);
-    if (indiceHistoria >= colaHistorias.length) {
-      cerrarVisorHistoria();
-      return;
-    }
-    const h = colaHistorias[indiceHistoria];
-    visorHora.textContent = h.hora || '';
-
-    // Barras superiores estilo Instagram
-    visorBarras.innerHTML = colaHistorias.map((_, idx) =>
-      `<div class="barra-prog ${idx <= indiceHistoria ? 'activa' : ''}"></div>`
-    ).join('');
-
-    const esVid = (h.es_video === true || h.es_video === 1 || h.es_video === 'True');
-    if (esVid) {
-      visorMedia.innerHTML = `<video src="${h.archivo_multimedia}" autoplay playsinline onended="siguienteHistoria()"></video>`;
-    } else {
-      visorMedia.innerHTML = `<img src="${h.archivo_multimedia}" alt="Historia">`;
-      timerHistoria = setTimeout(siguienteHistoria, 5000); // 5 seg por foto
-    }
-
-    // Mostrar opción de destacar si es historia propia con ID
-    if (h.id && h.usuario_id == miUserId && formDestacarVisor) {
-      formDestacarVisor.hidden = false;
-      formDestacarVisor.action = '/historia/destacar/' + h.id;
-    } else if (formDestacarVisor) {
-      formDestacarVisor.hidden = true;
-    }
-  }
-
-  function siguienteHistoria() {
-    indiceHistoria++;
-    renderHistoriaActual();
-  }
-
-  function cerrarVisorHistoria() {
-    clearTimeout(timerHistoria);
-    if (visorMedia) visorMedia.innerHTML = '';
-    if (visorHist) visorHist.close();
-  }
-
-  document.querySelectorAll('.btn-abrir-historia').forEach(btn => {
-    btn.addEventListener('click', () => {
-      colaHistorias = JSON.parse(btn.getAttribute('data-items') || '[]');
-      if (!colaHistorias.length) return;
-      visorAutor.textContent = btn.getAttribute('data-username');
-      indiceHistoria = 0;
-      renderHistoriaActual();
-      visorHist.showModal();
-    });
-  });
-
-  document.querySelectorAll('.btn-ver-destacada').forEach(btn => {
-    btn.addEventListener('click', () => {
-      visorAutor.textContent = '⭐ ' + btn.getAttribute('data-titulo');
-      colaHistorias = [{
-        archivo_multimedia: btn.getAttribute('data-url'),
-        es_video: btn.getAttribute('data-video')
-      }];
-      indiceHistoria = 0;
-      renderHistoriaActual();
-      visorHist.showModal();
-    });
-  });
-
-  const btnCerrarVisor = document.getElementById('cerrar-visor-hist');
-  if (btnCerrarVisor) btnCerrarVisor.addEventListener('click', cerrarVisorHistoria);
 </script>
 
 <style>
