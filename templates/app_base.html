@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 <body>
-  {% from "iconos.html" import casa, usuario as icono_usuario, salir as icono_salir, mensaje as icono_mensaje, reel as icono_reel %}
+  {% from "iconos.html" import casa, usuario as icono_usuario, salir as icono_salir, mensaje as icono_mensaje, reel as icono_reel, campana as icono_campana %}
   <div class="app">
     <nav class="lateral" aria-label="Principal">
       <p class="logo">StandsUTA</p>
@@ -32,14 +32,21 @@
         {{ icono_mensaje() }}<span>Mensajes</span>
       </a>
 
-      <a class="nav-item" href="{{ url_for('mensajeria') }}" {% if seccion == 'mensajes' %}aria-current="page"{% endif %}>
-        {{ icono_mensaje() }}<span>Mensajes</span>
-      </a>
-
+    
       <a class="nav-item" href="{{ url_for('reels') }}" {% if seccion == 'reels' %}aria-current="page"{% endif %}>
         {{ icono_reel() }}<span>Reels</span>
       </a>
 
+      <a class="nav-item" href="{{ url_for('notificaciones') }}" {% if seccion == 'notificaciones' %}aria-current="page"{% endif %}>
+        {{ icono_campana() }}
+        <span>Notificaciones</span>
+        {% if notif_no_leidas and notif_no_leidas > 0 %}
+          <span style="margin-left:auto; background:var(--coral); color:#fff; font-size:0.72rem; padding:0.1rem 0.45rem; border-radius:99px;">
+            {{ notif_no_leidas }}
+          </span>
+        {% endif %}
+      </a>
+      
       <!-- SALIR PERMANECE AL FINAL -->
       <a class="nav-item salir" href="{{ url_for('salir') }}">
         {{ icono_salir() }}<span>Salir</span>

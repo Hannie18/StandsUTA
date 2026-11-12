@@ -1,0 +1,97 @@
+{% extends "app_base.html" %}
+{% block titulo %}Notificaciones · StandsUTA{% endblock %}
+
+{% block contenido %}
+  <header class="barra-sup">
+    <h1>Notificaciones</h1>
+    {% if notificaciones %}
+      <form action="{{ url_for('limpiar_notificaciones') }}" method="post" onsubmit="return confirm('¿Vaciar todas las notificaciones?');">
+        <button type="submit" class="boton-sec btn-sm btn-borrar">Limpiar bandeja</button>
+      </form>
+    {% endif %}
+  </header>
+
+  <section class="lista-notificaciones">
+    {% for n in notificaciones %}
+      <div class="tarjeta-post item-notif {% if not n.leida %}notif-nueva{% endif %}">
+        <a href="{{ url_for('perfil_publico', username=n.emisor_username) }}" class="notif-usuario">
+          {% if n.emisor_foto %}
+            <img src="{{ n.emisor_foto }}" alt="@{{ n.emisor_username }}" class="avatar-notif">
+          {% else %}
+            <div class="avatar-min">{{ n.emisor_username[0]|upper }}</div>
+          {% endif %}
+        </a>
+
+        <div class="notif-texto">
+          <a href="{{ url_for('perfil_publico', username=n.emisor_username) }}" style="text-decoration:none; color:var(--negro);">
+            <strong>@{{ n.emisor_username }}</strong>
+          </a>
+          {% if n.tipo == 'like_post' %}
+            le dio ❤️ Me gusta a tu Stand.
+          {% elif n.tipo == 'comentario' %}
+            comentó 💬 tu Stand.
+          {% elif n.tipo == 'seguidor' %}
+            comenzó a seguirte 👤.
+          {% elif n.tipo == 'like_reel' %}
+            le dio ❤️ Me gusta a tu Reel.
+          {% endif %}
+          <span class="notif-fecha">{{ n.fecha }}</span>
+        </div>
+
+        {% if n.tipo == 'like_reel' %}
+          <a href="{{ url_for('reels') }}" class="boton-sec btn-sm">Ver Reel</a>
+        {% elif n.tipo in ('like_post', 'comentario') %}
+          <a href="{{ url_for('perfil') }}" class="boton-sec btn-sm">Ver Stand</a>
+        {% else %}
+          <a href="{{ url_for('perfil_publico', username=n.emisor_username) }}" class="boton-sec btn-sm">Ver perfil</a>
+        {% endif %}
+      </div>
+    {% else %}
+      <section class="vacio">
+        <p><strong>No tienes notificaciones aún</strong></p>
+        <p>Cuando alguien siga tu perfil, comente o dé me gusta a tus Stands o Reels, aparecerá aquí.</p>
+      </section>
+    {% endfor %}
+  </section>
+
+  <style>
+    .lista-notificaciones {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    .item-notif {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      padding: 0.85rem 1rem;
+    }
+
+    .item-notif.notif-nueva {
+      background: #fff3f4;
+      border-left: 4px solid var(--rojo);
+    }
+
+    .avatar-notif {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid var(--coral);
+    }
+
+    .notif-texto {
+      flex: 1;
+      font-size: 0.92rem;
+      line-height: 1.35;
+    }
+
+    .notif-fecha {
+      display: block;
+      font-size: 0.76rem;
+      color: #6b4a47;
+      margin-top: 0.15rem;
+    }
+  </style>
+{% endblock %}

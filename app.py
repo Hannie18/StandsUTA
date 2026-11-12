@@ -90,6 +90,33 @@ def destino_seguro(destino):
     # solo rutas internas del propio sitio
     return destino.startswith("/") and not destino.startswith("//")
 
+def crear_notificacion(usuario_destino_id, emisor_id, tipo, referencia_id=None):
+    if not usuario_destino_id or usuario_destino_id == emisor_id:
+        return  # No notificarse a uno mismo
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO notificaciones (usuario_id, emisor_id, tipo, referencia_id) VALUES (%s, %s, %s, %s)",
+            (usuario_destino_id, emisor_id, tipo, referencia_id)
+        )
+    db.commit()
+    db.close()
+
+
+@app.context_processor
+def inyectar_notificaciones():
+    if "user_id" not in session:
+        return {"notif_no_leidas": 0}
+    try:
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS total FROM notificaciones WHERE usuario_id=%s AND leida=FALSE", (session["user_id"],))
+            total = cur.fetchone()["total"]
+        db.close()
+        return {"notif_no_leidas": total}
+    except Exception:
+        return {"notif_no_leidas": 0}
+
 
 # ---------- Inicio de sesión y registro ----------
 @app.route("/", methods=["GET", "POST"])
@@ -309,6 +336,11 @@ def dar_like(pub_id):
         else:
             cur.execute("INSERT INTO me_gusta (usuario_id, publicacion_id) VALUES (%s, %s)", (user_id, pub_id))
             le_gusta = True
+
+            cur.execute("SELECT usuario_id FROM publicaciones WHERE id=%s", (pub_id,))
+            dueno = cur.fetchone()
+            if dueno:
+                crear_notificacion(dueno["usuario_id"], session["user_id"], "comentario", pub_id)
         db.commit()
         
         cur.execute("SELECT COUNT(*) as total FROM me_gusta WHERE publicacion_id=%s", (pub_id,))
@@ -915,6 +947,8 @@ def seguir_usuario(perfil_id):
         else:
             cur.execute("INSERT INTO seguidores (seguidor_id, seguido_id) VALUES (%s, %s)", (user_id, perfil_id))
             siguiendo = True
+
+            crear_notificacion(perfil_id, user_id, "seguidor")
         db.commit()
 
         # Obtener los nuevos contadores
@@ -1221,6 +1255,10 @@ def like_reel(reel_id):
         else:
             cur.execute("INSERT INTO reel_likes (usuario_id, reel_id) VALUES (%s, %s)", (user_id, reel_id))
             le_gusta = True
+            cur.execute("SELECT usuario_id FROM reels WHERE id=%s", (reel_id,))
+            dueno = cur.fetchone()
+            if dueno:
+                crear_notificacion(dueno["usuario_id"], user_id, "like_reel", reel_id)
         db.commit()
 
         cur.execute("SELECT COUNT(*) AS total FROM reel_likes WHERE reel_id=%s", (reel_id,))
@@ -1228,6 +1266,41 @@ def like_reel(reel_id):
     db.close()
     return {"status": "ok", "le_gusta": le_gusta, "total": total}
 
+# ---------- NOTIFICACIONES ----------
+@app.route("/notificaciones")
+@login_requerido
+def notificaciones():
+    user_id = session["user_id"]
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("""
+            SELECT n.*, u.username AS emisor_username, u.foto AS emisor_foto,
+                   DATE_FORMAT(n.creado_en, '%%d/%%m %%H:%%i') AS fecha
+            FROM notificaciones n
+            JOIN usuarios u ON n.emisor_id = u.id
+            WHERE n.usuario_id = %s
+            ORDER BY n.creado_en DESC
+            LIMIT 50
+        """, (user_id,))
+        lista = cur.fetchall()
+
+        # Marcar todas como leídas al abrir la bandeja
+        cur.execute("UPDATE notificaciones SET leida=TRUE WHERE usuario_id=%s AND leida=FALSE", (user_id,))
+        db.commit()
+    db.close()
+    return render_template("notificaciones.html", notificaciones=lista, seccion="notificaciones")
+
+
+@app.route("/notificaciones/limpiar", methods=["POST"])
+@login_requerido
+def limpiar_notificaciones():
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM notificaciones WHERE usuario_id=%s", (session["user_id"],))
+        db.commit()
+    db.close()
+    flash("Bandeja de notificaciones vaciada.", "ok")
+    return redirect(url_for("notificaciones"))
 
 if __name__ == "__main__":
     app.run(debug=True)
